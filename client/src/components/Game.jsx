@@ -9,45 +9,80 @@ export default function Game({ socket, roomId, name, leave }) {
   const [revealedIds, setRevealedIds] = useState(new Set());
 
   useEffect(() => {
-    socket.on("stateUpdate", (s) => {
-      setPublicState(s);
-    });
+    console.log("Game mounted for room:", roomId);
 
-    socket.on("yourHand", (hand) => {
+    const handleState = (state) => {
+      console.log("stateUpdate received:", state);
+      setPublicState(state);
+    };
+
+    const handleHand = (hand) => {
+      console.log("yourHand received:", hand);
       setMyHand(hand || []);
+    };
+
+    const handleGameStarted = () => {
+      console.log("gameStarted received");
+    };
+
+    socket.on("stateUpdate", handleState);
+    socket.on("yourHand", handleHand);
+    socket.on("gameStarted", handleGameStarted);
+
+    // 🔥 WICHTIG: sofort aktuellen Zustand holen
+    socket.emit("roomInfo", roomId, (res) => {
+      console.log("roomInfo response:", res);
+      if (res?.ok && res.publicState) {
+        setPublicState(res.publicState);
+      }
     });
 
     return () => {
-      socket.off("stateUpdate");
-      socket.off("yourHand");
+      socket.off("stateUpdate", handleState);
+      socket.off("yourHand", handleHand);
+      socket.off("gameStarted", handleGameStarted);
     };
-  }, [socket]);
+  }, [socket, roomId]);
 
   const takeFrom = (from) => {
     socket.emit("take", { roomId, from }, (res) => {
-      if (res?.ok) setDrawnCard(res.card);
+      if (res?.ok) {
+        setDrawnCard(res.card);
+      }
     });
   };
 
   const swapWith = (index) => {
     if (drawnCard == null) return;
+
     socket.emit(
       "swap",
       { roomId, index, drawnCard },
-      () => setDrawnCard(null)
+      (res) => {
+        if (res?.ok) {
+          setDrawnCard(null);
+        }
+      }
     );
   };
 
   const discardDrawn = () => {
     if (drawnCard == null) return;
+
     socket.emit(
       "swap",
       { roomId, index: -1, drawnCard },
-      () => setDrawnCard(null)
+      (res) => {
+        if (res?.ok) {
+          setDrawnCard(null);
+        }
+      }
     );
   };
 
   const peekTwo = () => {
+    if (!myHand.length) return;
+
     const ids = myHand.slice(0, 2).map((c) => c.id);
     setRevealedIds(new Set(ids));
   };
@@ -60,6 +95,8 @@ export default function Game({ socket, roomId, name, leave }) {
 
   return (
     <div className="card-box">
+      <h2>Spiel</h2>
+
       <div>
         <strong>Am Zug: {currentName}</strong>
       </div>
@@ -67,7 +104,7 @@ export default function Game({ socket, roomId, name, leave }) {
       <div style={{ marginTop: 10 }}>
         <button onClick={peekTwo}>2 Karten anschauen</button>
         <button onClick={() => takeFrom("deck")}>
-          Nachziehstapel ({publicState?.deckCount || 0})
+          Nachziehstapel ({publicState?.deckCount ?? 0})
         </button>
         <button onClick={() => takeFrom("discard")}>
           Ablage ({publicState?.discardTop ?? "—"})
@@ -78,6 +115,7 @@ export default function Game({ socket, roomId, name, leave }) {
         <button onClick={leave}>Zur Lobby</button>
       </div>
 
+      {/* Gegner oben */}
       <div style={{ marginTop: 20 }}>
         {(publicState?.players || [])
           .filter((p) => p !== socket.id)
@@ -90,6 +128,7 @@ export default function Game({ socket, roomId, name, leave }) {
           ))}
       </div>
 
+      {/* Eigene Karten unten */}
       <div style={{ marginTop: 20 }}>
         <Hand
           hand={myHand}
