@@ -1,68 +1,44 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 
 export default function Lobby({ socket, setRoomId, name, setName }) {
   const [roomInput, setRoomInput] = useState("");
-  const [players, setPlayers] = useState([]);
-
-  useEffect(() => {
-    const handler = (data) => {
-      setPlayers(Object.values(data.names || {}));
-    };
-    socket.on("roomUpdate", handler);
-    return () => socket.off("roomUpdate", handler);
-  }, [socket]);
 
   const createRoom = () => {
-    if (!roomInput || !name) return alert("Name & Raum-ID eingeben");
+    if (!roomInput || !name) return alert("Bitte Name & Raum-ID eingeben");
+    // createRoom now expects payload {roomId, name}
     socket.emit("createRoom", { roomId: roomInput, name }, (res) => {
-      if (res?.ok) setRoomId(roomInput);
+      if (res?.ok) {
+        setRoomId(roomInput);
+      } else {
+        alert(res?.error || "Fehler beim Erstellen");
+      }
     });
   };
 
   const joinRoom = () => {
-    if (!roomInput || !name) return alert("Name & Raum-ID eingeben");
+    if (!roomInput || !name) return alert("Bitte Name & Raum-ID eingeben");
     socket.emit("joinRoom", { roomId: roomInput, name }, (res) => {
       if (res?.ok) setRoomId(roomInput);
+      else alert(res?.error || "Fehler beim Beitreten");
     });
   };
 
-  const startGame = () => {
-    socket.emit("startGame", roomInput);
-  };
-
   return (
-    <div className="card-box">
+    <div className="card-box lobby">
       <h2>Lobby</h2>
+      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <input placeholder="Dein Name" value={name} onChange={(e) => setName(e.target.value)} />
+        <input placeholder="Raum-ID" value={roomInput} onChange={(e) => setRoomInput(e.target.value)} />
+      </div>
 
-      <input
-        placeholder="Dein Name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-      />
-
-      <input
-        placeholder="Raum-ID"
-        value={roomInput}
-        onChange={(e) => setRoomInput(e.target.value)}
-      />
-
-      <div>
+      <div style={{ display: "flex", gap: 8 }}>
         <button onClick={createRoom}>Raum erstellen</button>
         <button onClick={joinRoom}>Beitreten</button>
       </div>
 
-      <div style={{ marginTop: 10 }}>
-        Spieler: {players.length ? players.join(", ") : "—"}
-      </div>
-
-      {players.length === 2 && (
-        <button
-          style={{ marginTop: 15, background: "#16a34a", color: "white" }}
-          onClick={startGame}
-        >
-          Spiel starten
-        </button>
-      )}
+      <p style={{ marginTop: 12, color: "#555" }}>
+        Tipp: Teile die Raum-ID mit deinem Freund; beide müssen im selben Raum sein bevor das Spiel gestartet wird.
+      </p>
     </div>
   );
 }
