@@ -1,0 +1,17 @@
+body{font-family:Inter,Arial;margin:20px;background:#f2f6fb;color:#111}
+.card-box{background:#fff;border-radius:12px;padding:12px;max-width:980px;margin:10px auto;box-shadow:0 8px 30px rgba(20,40,80,0.06)}
+.topbar{display:flex;justify-content:space-between;align-items:center}
+.controls button{margin:4px;padding:8px;border-radius:8px;border:0;background:#2463f2;color:white;cursor:pointer}
+.board{display:flex;gap:16px;margin-top:12px}
+.opponents{flex:1}
+.center-stack{flex:1;display:flex;justify-content:center;align-items:center}
+.stack{display:flex;flex-direction:column;gap:8px;align-items:center}
+.deck,.discard,.drawn{padding:12px;border-radius:8px;background:#f7f9ff;border:1px solid #e2e8f0}
+.your-hand{margin-top:12px}
+.hand .cards{display:flex;gap:10px}
+.card{background:#fff;border:1px solid #e8eef8;padding:10px;border-radius:8px;min-width:90px;text-align:center}
+.card .val{font-size:20px;font-weight:700}
+.opponent{background:#fafbfd;padding:8px;border-radius:8px;margin-bottom:8px}
+.opp-cards{display:flex;gap:6px}
+.opp-card{width:34px;height:48px;border-radius:6px;background:#e6eefc;display:flex;align-items:center;justify-content:center}
+.logs{margin-top:10px}
