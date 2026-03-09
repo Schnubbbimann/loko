@@ -59,22 +59,33 @@ io.on("connection", (socket) => {
   });
 
   /* ==========================
-     ROOM INFO (FIX!)
+     ROOM INFO (MIT GAME STATE!)
   ========================== */
   socket.on("roomInfo", (roomId, cb) => {
     const room = roomManager.getRoom(roomId);
     if (!room) return cb && cb({ ok: false });
+
+    const publicState = room.game
+      ? room.game.getPublicState()
+      : null;
 
     cb &&
       cb({
         ok: true,
         players: room.players.length,
         names: room.names,
+        publicState,
       });
+
+    // Falls Spiel existiert → sende private Hand
+    if (room.game) {
+      const hand = room.game.getPrivateHand(socket.id);
+      socket.emit("yourHand", hand || []);
+    }
   });
 
   /* ==========================
-     SPIEL STARTEN
+     SPIEL STARTEN (TIMING FIX)
   ========================== */
   socket.on("startGame", (roomId, cb) => {
     const room = roomManager.getRoom(roomId);
@@ -85,9 +96,13 @@ io.on("connection", (socket) => {
 
     roomManager.startGame(roomId);
 
-    broadcastState(roomId);
-
+    // Erst GameStarted senden
     io.to(roomId).emit("gameStarted");
+
+    // Dann State senden (leicht verzögert)
+    setTimeout(() => {
+      broadcastState(roomId);
+    }, 60);
 
     cb && cb({ ok: true });
   });
@@ -164,6 +179,8 @@ io.on("connection", (socket) => {
     if (!room || !room.game) return;
 
     const game = room.game;
+
+    console.log("broadcastState:", roomId);
 
     io.to(roomId).emit("stateUpdate", {
       ...game.getPublicState(),
