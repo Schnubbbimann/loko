@@ -1,21 +1,29 @@
 import React from "react";
 
-export default function Hand({ hand = [], onSwap, onRemovePair }) {
+export default function Hand({ hand, onSwap, revealedIds }) {
   return (
-    <div className="hand">
-      <h4>Dein Blatt</h4>
-      <div className="cards">
-        {hand.map((c,i)=>(
-          <div className="card" key={c?.id || i}>
-            <div className="val">{c.revealed ? c.value : c.value /* we show player's own cards always */}</div>
-            <div className="actions">
-              <button onClick={()=> onSwap(i) }>Mit gezogener tauschen</button>
+    <div>
+      <h3>Dein Blatt</h3>
+      <div style={{ display: "flex", gap: 10 }}>
+        {hand.map((c, i) => {
+          const revealed =
+            revealedIds.has(c.id) || c.revealed;
+          return (
+            <div
+              key={c.id}
+              style={{
+                border: "1px solid black",
+                padding: 10,
+                width: 80,
+                textAlign: "center",
+                cursor: "pointer",
+              }}
+              onClick={() => onSwap(i)}
+            >
+              {revealed ? c.value : "verdeckt"}
             </div>
-          </div>
-        ))}
-      </div>
-      <div className="pair-note">
-        Um zwei gleiche Karten zu entfernen: klicke die Buttons daneben (in dieser minimal UI bitte angeben, z.B. removePair(0,2))
+          );
+        })}
       </div>
     </div>
   );
