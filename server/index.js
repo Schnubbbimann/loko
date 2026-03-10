@@ -79,6 +79,10 @@ io.on("connection", (socket) => {
 
     roomManager.startGame(roomId);
 
+    // 🔥 Reset draw tracking
+    room.game.hasDrawn = {};
+    room.game.lastDrawSource = {};
+
     io.to(roomId).emit("gameStarted");
 
     setTimeout(() => {
@@ -98,13 +102,17 @@ io.on("connection", (socket) => {
     if (game.getCurrentPlayer() !== socket.id)
       return cb && cb({ ok: false });
 
+    game.hasDrawn = game.hasDrawn || {};
+    game.lastDrawSource = game.lastDrawSource || {};
+
+    // ❌ Nur eine Karte pro Zug
+    if (game.hasDrawn[socket.id])
+      return cb && cb({ ok: false });
+
     let card;
 
     if (from === "deck") {
       card = game.drawCard();
-
-      // 🔥 Merken woher die Karte kam
-      game.lastDrawSource = game.lastDrawSource || {};
       game.lastDrawSource[socket.id] = "deck";
     }
 
@@ -113,10 +121,10 @@ io.on("connection", (socket) => {
         return cb && cb({ ok: false });
 
       card = game.discard.pop();
-
-      game.lastDrawSource = game.lastDrawSource || {};
       game.lastDrawSource[socket.id] = "discard";
     }
+
+    game.hasDrawn[socket.id] = true;
 
     cb && cb({ ok: true, card });
   });
@@ -137,8 +145,9 @@ io.on("connection", (socket) => {
       game.lastDrawSource &&
       game.lastDrawSource[socket.id] === "deck";
 
-    // 🔥 Spezial nur wenn vom Deck + direkt abgelegt
+    // 🔥 Spezial nur bei Deck + direkt ablegen
     if (index === -1 && isSpecial && wasFromDeck) {
+
       let type = null;
 
       if (drawnCard === 7 || drawnCard === 8)
@@ -153,18 +162,19 @@ io.on("connection", (socket) => {
         value: drawnCard
       };
 
-      io.to(socket.id).emit("specialAction", { type });
-
-      return cb && cb({ ok: true });
+      return io.to(socket.id).emit("specialAction", { type });
     }
 
-    // Normale Behandlung
+    // Normales Verhalten
 
     if (index === -1) {
       game.discard.push(drawnCard);
     } else {
       game.replaceCard(socket.id, index, drawnCard);
     }
+
+    // 🔥 Reset draw state nach Abschluss des Zuges
+    game.hasDrawn[socket.id] = false;
 
     game.nextTurn();
     broadcastState(roomId);
@@ -195,10 +205,8 @@ io.on("connection", (socket) => {
     if (v === 9 || v === 10) {
       const opponent =
         game.players.find((p) => p !== socket.id);
-
       const card =
         game.getPrivateHand(opponent)[payload.index];
-
       io.to(socket.id).emit("revealOpponent", {
         value: card.value
       });
@@ -210,7 +218,6 @@ io.on("connection", (socket) => {
 
       const ownCard =
         game.playerState[socket.id].hand[payload.ownIndex];
-
       const oppCard =
         game.playerState[opponent].hand[payload.oppIndex];
 
@@ -219,6 +226,8 @@ io.on("connection", (socket) => {
       oppCard.value = tmp;
     }
 
+    // Spezial beendet ebenfalls den Zug
+    game.hasDrawn[socket.id] = false;
     game.nextTurn();
     broadcastState(roomId);
 
