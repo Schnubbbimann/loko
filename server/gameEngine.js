@@ -65,14 +65,19 @@ class CaboGame {
     return this.deck.pop();
   }
 
-  replaceCard(playerId, handIndex, newVal) {
-    // swap: replace player's card at index with newVal, push old to discard, reveal replaced card
-    const slot = this.playerState[playerId].hand[handIndex];
-    const old = slot.value;
-    this.playerState[playerId].hand[handIndex] = { id: uuidv4(), value: newVal, revealed: true };
-    this.discard.push(old);
-    // check pair-removal not triggered here
-  }
+replaceCard(playerId, handIndex, newVal) {
+  const slot = this.playerState[playerId].hand[handIndex];
+  const old = slot.value;
+
+  // Neue Karte bleibt verdeckt!
+  this.playerState[playerId].hand[handIndex] = {
+    id: uuidv4(),
+    value: newVal,
+    revealed: false
+  };
+
+  this.discard.push(old);
+}
 
   removePair(playerId, idx1, idx2) {
     // idx1, idx2 must exist and values identical
