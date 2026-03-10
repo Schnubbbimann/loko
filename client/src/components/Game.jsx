@@ -11,6 +11,11 @@ export default function Game({ socket, roomId, leave }) {
   const [special, setSpecial] = useState(null);
   const [selectedOwn, setSelectedOwn] = useState(null);
 
+  // 🔥 Neue States für Startkarten
+  const [initialPeekMode, setInitialPeekMode] = useState(false);
+  const [initialPeekSelection, setInitialPeekSelection] = useState([]);
+  const [initialPeekDone, setInitialPeekDone] = useState(false);
+
   /* ================= SOCKET ================= */
 
   useEffect(() => {
@@ -44,6 +49,32 @@ export default function Game({ socket, roomId, leave }) {
     };
   }, [socket, roomId]);
 
+  /* ================= STARTKARTEN ================= */
+
+  const peekTwo = () => {
+    if (initialPeekDone) return;
+    setInitialPeekMode(true);
+    setInitialPeekSelection([]);
+  };
+
+  const handleInitialPeekClick = (cardId) => {
+    if (!initialPeekMode) return;
+    if (initialPeekSelection.includes(cardId)) return;
+
+    const newSelection = [...initialPeekSelection, cardId];
+    setInitialPeekSelection(newSelection);
+
+    if (newSelection.length === 2) {
+      setRevealedIds(new Set(newSelection));
+
+      setTimeout(() => {
+        setRevealedIds(new Set());
+        setInitialPeekMode(false);
+        setInitialPeekDone(true);
+      }, 2000);
+    }
+  };
+
   /* ================= NORMAL ACTIONS ================= */
 
   const takeFrom = (from) => {
@@ -66,12 +97,7 @@ export default function Game({ socket, roomId, leave }) {
     });
   };
 
-  const peekTwo = () => {
-    const ids = myHand.slice(0, 2).map((c) => c.id);
-    setRevealedIds(new Set(ids));
-  };
-
-  /* ================= SPECIAL ACTIONS ================= */
+  /* ================= SPECIAL ================= */
 
   const handleOwnPeek = (index) => {
     socket.emit("specialResolve", {
@@ -122,17 +148,28 @@ export default function Game({ socket, roomId, leave }) {
       </div>
 
       <div style={{ marginTop: 10 }}>
-        <button onClick={peekTwo}>2 Karten anschauen</button>
+        <button
+          onClick={peekTwo}
+          disabled={initialPeekDone}
+        >
+          2 Karten anschauen
+        </button>
+
         <button onClick={() => takeFrom("deck")}>
           Nachziehstapel ({publicState?.deckCount ?? 0})
         </button>
+
         <button onClick={() => takeFrom("discard")}>
           Ablage ({publicState?.discardTop ?? "—"})
         </button>
+
         <button onClick={discardDrawn}>
           Gezogene abwerfen
         </button>
-        <button onClick={leave}>Zur Lobby</button>
+
+        <button onClick={leave}>
+          Zur Lobby
+        </button>
       </div>
 
       {/* Gegner */}
@@ -152,15 +189,13 @@ export default function Game({ socket, roomId, leave }) {
                   borderRadius: 8,
                 }}
               />
+
               {special === "peekOpponent" && (
-                <button
-                  onClick={() =>
-                    handleOpponentPeek(i)
-                  }
-                >
+                <button onClick={() => handleOpponentPeek(i)}>
                   Anschauen
                 </button>
               )}
+
               {special === "swapOpponent" &&
                 selectedOwn !== null && (
                   <button
@@ -183,6 +218,7 @@ export default function Game({ socket, roomId, leave }) {
           {myHand.map((c, i) => {
             const revealed =
               revealedIds.has(c.id) || c.revealed;
+
             return (
               <div key={c.id} style={{ textAlign: "center" }}>
                 <div
@@ -195,18 +231,21 @@ export default function Game({ socket, roomId, leave }) {
                     justifyContent: "center",
                     borderRadius: 8,
                     background: "#fff",
+                    cursor: "pointer",
                   }}
-                  onClick={() => swapWith(i)}
+                  onClick={() => {
+                    if (initialPeekMode) {
+                      handleInitialPeekClick(c.id);
+                    } else {
+                      swapWith(i);
+                    }
+                  }}
                 >
                   {revealed ? c.value : "verdeckt"}
                 </div>
 
                 {special === "peekOwn" && (
-                  <button
-                    onClick={() =>
-                      handleOwnPeek(i)
-                    }
-                  >
+                  <button onClick={() => handleOwnPeek(i)}>
                     Anschauen
                   </button>
                 )}
