@@ -22,9 +22,12 @@ export default function Game({ socket, roomId, leave }) {
     socket.on("stateUpdate", setPublicState);
     socket.on("yourHand", setMyHand);
 
-    socket.on("specialAction", (data) => {
-      setSpecial(data.type);
-    });
+socket.on("specialAction", (data) => {
+  // 🔥 gezogene Karte sofort löschen
+  setDrawnCard(null);
+
+  setSpecial(data.type);
+});
 
     socket.on("revealOwn", (d) => {
       alert("Deine Karte: " + d.value);
