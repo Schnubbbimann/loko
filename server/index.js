@@ -79,7 +79,6 @@ io.on("connection", (socket) => {
 
     roomManager.startGame(roomId);
 
-    // 🔥 Reset draw tracking
     room.game.hasDrawn = {};
     room.game.lastDrawSource = {};
 
@@ -105,7 +104,6 @@ io.on("connection", (socket) => {
     game.hasDrawn = game.hasDrawn || {};
     game.lastDrawSource = game.lastDrawSource || {};
 
-    // ❌ Nur eine Karte pro Zug
     if (game.hasDrawn[socket.id])
       return cb && cb({ ok: false });
 
@@ -148,6 +146,9 @@ io.on("connection", (socket) => {
     // 🔥 Spezial nur bei Deck + direkt ablegen
     if (index === -1 && isSpecial && wasFromDeck) {
 
+      // ⭐ WICHTIG: Karte zuerst korrekt auf Ablage legen
+      game.discard.push(drawnCard);
+
       let type = null;
 
       if (drawnCard === 7 || drawnCard === 8)
@@ -162,7 +163,9 @@ io.on("connection", (socket) => {
         value: drawnCard
       };
 
-      return io.to(socket.id).emit("specialAction", { type });
+      io.to(socket.id).emit("specialAction", { type });
+
+      return;
     }
 
     // Normales Verhalten
@@ -173,7 +176,6 @@ io.on("connection", (socket) => {
       game.replaceCard(socket.id, index, drawnCard);
     }
 
-    // 🔥 Reset draw state nach Abschluss des Zuges
     game.hasDrawn[socket.id] = false;
 
     game.nextTurn();
@@ -205,8 +207,10 @@ io.on("connection", (socket) => {
     if (v === 9 || v === 10) {
       const opponent =
         game.players.find((p) => p !== socket.id);
+
       const card =
         game.getPrivateHand(opponent)[payload.index];
+
       io.to(socket.id).emit("revealOpponent", {
         value: card.value
       });
@@ -226,8 +230,8 @@ io.on("connection", (socket) => {
       oppCard.value = tmp;
     }
 
-    // Spezial beendet ebenfalls den Zug
     game.hasDrawn[socket.id] = false;
+
     game.nextTurn();
     broadcastState(roomId);
 
