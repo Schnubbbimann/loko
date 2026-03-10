@@ -8,7 +8,6 @@ const roomManager = require("./roomManager");
 const app = express();
 app.use(cors());
 
-// React Build ausliefern
 app.use(express.static(path.join(__dirname, "../client/dist")));
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../client/dist/index.html"));
@@ -18,20 +17,19 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 io.on("connection", (socket) => {
-  console.log("Connected:", socket.id);
 
   /* ================= ROOM ================= */
 
   socket.on("createRoom", ({ roomId, name }, cb) => {
     roomManager.createRoom(roomId);
-    roomManager.joinRoom(roomId, socket.id, name || "Spieler");
+    roomManager.joinRoom(roomId, socket.id, name);
     socket.join(roomId);
 
     const room = roomManager.getRoom(roomId);
 
     io.to(roomId).emit("roomUpdate", {
       players: room.players.length,
-      names: room.names,
+      names: room.names
     });
 
     cb && cb({ ok: true });
@@ -41,12 +39,12 @@ io.on("connection", (socket) => {
     const room = roomManager.getRoom(roomId);
     if (!room) return cb && cb({ ok: false });
 
-    roomManager.joinRoom(roomId, socket.id, name || "Spieler");
+    roomManager.joinRoom(roomId, socket.id, name);
     socket.join(roomId);
 
     io.to(roomId).emit("roomUpdate", {
       players: room.players.length,
-      names: room.names,
+      names: room.names
     });
 
     cb && cb({ ok: true });
@@ -60,13 +58,12 @@ io.on("connection", (socket) => {
       ? room.game.getPublicState()
       : null;
 
-    cb &&
-      cb({
-        ok: true,
-        players: room.players.length,
-        names: room.names,
-        publicState,
-      });
+    cb && cb({
+      ok: true,
+      players: room.players.length,
+      names: room.names,
+      publicState
+    });
 
     if (room.game) {
       socket.emit("yourHand", room.game.getPrivateHand(socket.id));
@@ -101,25 +98,32 @@ io.on("connection", (socket) => {
     if (game.getCurrentPlayer() !== socket.id)
       return cb && cb({ ok: false });
 
+    let card;
+
     if (from === "deck") {
-      const card = game.drawCard();
-      return cb && cb({ ok: true, card });
+      card = game.drawCard();
+
+      // 🔥 Merken woher die Karte kam
+      game.lastDrawSource = game.lastDrawSource || {};
+      game.lastDrawSource[socket.id] = "deck";
     }
 
     if (from === "discard") {
       if (!game.discard.length)
         return cb && cb({ ok: false });
 
-      const card = game.discard.pop();
-      return cb && cb({ ok: true, card });
+      card = game.discard.pop();
+
+      game.lastDrawSource = game.lastDrawSource || {};
+      game.lastDrawSource[socket.id] = "discard";
     }
 
-    cb && cb({ ok: false });
+    cb && cb({ ok: true, card });
   });
 
   /* ================= SWAP / DISCARD ================= */
 
-  socket.on("swap", ({ roomId, index, drawnCard, drawnFrom }, cb) => {
+  socket.on("swap", ({ roomId, index, drawnCard }, cb) => {
     const room = roomManager.getRoom(roomId);
     const game = room?.game;
 
@@ -127,11 +131,14 @@ io.on("connection", (socket) => {
     if (game.getCurrentPlayer() !== socket.id)
       return cb && cb({ ok: false });
 
-    const isSpecial =
-      drawnCard >= 7 && drawnCard <= 12;
+    const isSpecial = drawnCard >= 7 && drawnCard <= 12;
 
-    // Spezial nur wenn vom Deck gezogen
-    if (index === -1 && isSpecial && drawnFrom === "deck") {
+    const wasFromDeck =
+      game.lastDrawSource &&
+      game.lastDrawSource[socket.id] === "deck";
+
+    // 🔥 Spezial nur wenn vom Deck + direkt abgelegt
+    if (index === -1 && isSpecial && wasFromDeck) {
       let type = null;
 
       if (drawnCard === 7 || drawnCard === 8)
@@ -143,7 +150,7 @@ io.on("connection", (socket) => {
 
       game.pendingSpecial = {
         player: socket.id,
-        value: drawnCard,
+        value: drawnCard
       };
 
       io.to(socket.id).emit("specialAction", { type });
@@ -154,10 +161,8 @@ io.on("connection", (socket) => {
     // Normale Behandlung
 
     if (index === -1) {
-      // Abwerfen
       game.discard.push(drawnCard);
     } else {
-      // Tauschen (bleibt verdeckt, gameEngine regelt revealed:false)
       game.replaceCard(socket.id, index, drawnCard);
     }
 
@@ -183,17 +188,19 @@ io.on("connection", (socket) => {
       const card =
         game.getPrivateHand(socket.id)[payload.index];
       io.to(socket.id).emit("revealOwn", {
-        value: card.value,
+        value: card.value
       });
     }
 
     if (v === 9 || v === 10) {
       const opponent =
         game.players.find((p) => p !== socket.id);
+
       const card =
         game.getPrivateHand(opponent)[payload.index];
+
       io.to(socket.id).emit("revealOpponent", {
-        value: card.value,
+        value: card.value
       });
     }
 
@@ -203,6 +210,7 @@ io.on("connection", (socket) => {
 
       const ownCard =
         game.playerState[socket.id].hand[payload.ownIndex];
+
       const oppCard =
         game.playerState[opponent].hand[payload.oppIndex];
 
@@ -228,7 +236,7 @@ io.on("connection", (socket) => {
 
         io.to(roomId).emit("roomUpdate", {
           players: room.players.length,
-          names: room.names,
+          names: room.names
         });
       }
     }
@@ -244,7 +252,7 @@ io.on("connection", (socket) => {
 
     io.to(roomId).emit("stateUpdate", {
       ...game.getPublicState(),
-      names: room.names,
+      names: room.names
     });
 
     room.players.forEach((pid) => {
@@ -256,7 +264,4 @@ io.on("connection", (socket) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () =>
-  console.log("Server läuft auf Port", PORT)
-);
+server.listen(process.env.PORT || 3000);
