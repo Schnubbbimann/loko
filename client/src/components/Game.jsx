@@ -2,172 +2,116 @@ import React, { useEffect, useState } from "react";
 import Hand from "./Hand";
 import Opponent from "./Opponent";
 
-export default function Game({ socket, roomId, name, leave }) {
+export default function Game({ socket, roomId, leave }) {
   const [publicState, setPublicState] = useState(null);
   const [myHand, setMyHand] = useState([]);
   const [drawnCard, setDrawnCard] = useState(null);
   const [revealedIds, setRevealedIds] = useState(new Set());
 
+  const [special, setSpecial] = useState(null);
+  const [selectedOwn, setSelectedOwn] = useState(null);
+
+  /* ================= SOCKET ================= */
+
   useEffect(() => {
-    console.log("Game mounted for room:", roomId);
+    socket.on("stateUpdate", setPublicState);
+    socket.on("yourHand", setMyHand);
 
-    const handleState = (state) => {
-      console.log("stateUpdate received:", state);
-      setPublicState(state);
-    };
+    socket.on("specialAction", (data) => {
+      setSpecial(data.type);
+    });
 
-    const handleHand = (hand) => {
-      console.log("yourHand received:", hand);
-      setMyHand(hand || []);
-      // keep revealed flags for persistent revealed cards
-      setRevealedIds((prev) => {
-        const next = new Set();
-        (hand || []).forEach((c) => {
-          if (prev.has(c.id) || c.revealed) next.add(c.id);
-        });
-        return next;
-      });
-    };
+    socket.on("revealOwn", (d) => {
+      alert("Deine Karte: " + d.value);
+    });
 
-    const handleGameStarted = () => {
-      console.log("gameStarted received");
-    };
+    socket.on("revealOpponent", (d) => {
+      alert("Gegnerkarte: " + d.value);
+    });
 
-    // Special handlers
-    const handleSpecial = (data) => {
-      console.log("specialAction received:", data);
-      // data: { type: "peekOwn"|"peekOpponent"|"swapOpponent" }
-      if (data.type === "peekOwn") {
-        const idx = parseInt(
-          prompt("Spezial: Welche deiner Karten anschauen? Index 0-3"),
-          10
-        );
-        if (!Number.isFinite(idx)) return;
-        socket.emit("specialResolve", { roomId, payload: { index: idx } }, (res) => {
-          console.log("specialResolve resp:", res);
-        });
-      } else if (data.type === "peekOpponent") {
-        const idx = parseInt(
-          prompt("Spezial: Welche Gegnerkarte anschauen? Index 0-3"),
-          10
-        );
-        if (!Number.isFinite(idx)) return;
-        socket.emit("specialResolve", { roomId, payload: { index: idx } }, (res) => {
-          console.log("specialResolve resp:", res);
-        });
-      } else if (data.type === "swapOpponent") {
-        const ownIndex = parseInt(
-          prompt("Spezial: Welche deiner Karten tauschen? Index 0-3"),
-          10
-        );
-        const oppIndex = parseInt(
-          prompt("Spezial: Welche Gegnerkarte tauschen? Index 0-3"),
-          10
-        );
-        if (!Number.isFinite(ownIndex) || !Number.isFinite(oppIndex)) return;
-        socket.emit(
-          "specialResolve",
-          { roomId, payload: { ownIndex, oppIndex } },
-          (res) => {
-            console.log("specialResolve swap resp:", res);
-          }
-        );
-      }
-    };
-
-    const handleRevealOwn = (d) => {
-      alert("Spezial — Deine Karte: " + d.value);
-      // optionally reveal locally (only your UI)
-      // find card id(s) with that value and mark revealed — but server will also send yourHand after broadcast
-    };
-
-    const handleRevealOpponent = (d) => {
-      alert("Spezial — Gegnerkarte: " + d.value);
-    };
-
-    socket.on("stateUpdate", handleState);
-    socket.on("yourHand", handleHand);
-    socket.on("gameStarted", handleGameStarted);
-
-    socket.on("specialAction", handleSpecial);
-    socket.on("revealOwn", handleRevealOwn);
-    socket.on("revealOpponent", handleRevealOpponent);
-
-    // IMPORTANT: Immediately request current room info (publicState + yourHand)
     socket.emit("roomInfo", roomId, (res) => {
-      console.log("roomInfo response:", res);
       if (res?.ok && res.publicState) {
         setPublicState(res.publicState);
       }
-      // server will also emit 'yourHand' if game exists
     });
 
     return () => {
-      socket.off("stateUpdate", handleState);
-      socket.off("yourHand", handleHand);
-      socket.off("gameStarted", handleGameStarted);
-
-      socket.off("specialAction", handleSpecial);
-      socket.off("revealOwn", handleRevealOwn);
-      socket.off("revealOpponent", handleRevealOpponent);
+      socket.off("stateUpdate");
+      socket.off("yourHand");
+      socket.off("specialAction");
+      socket.off("revealOwn");
+      socket.off("revealOpponent");
     };
   }, [socket, roomId]);
 
+  /* ================= NORMAL ACTIONS ================= */
+
   const takeFrom = (from) => {
     socket.emit("take", { roomId, from }, (res) => {
-      if (res?.ok) {
-        setDrawnCard(res.card);
-      } else {
-        alert("Karte konnte nicht genommen werden (nicht dein Zug oder leer)");
-      }
+      if (res?.ok) setDrawnCard(res.card);
     });
   };
 
   const swapWith = (index) => {
-    if (drawnCard == null) {
-      alert("Keine gezogene Karte zum Tauschen");
-      return;
-    }
-
-    socket.emit("swap", { roomId, index, drawnCard }, (res) => {
-      console.log("swap resp:", res);
-      if (res?.ok) {
-        // if special was triggered, server will send specialAction event
-        setDrawnCard(null);
-      } else {
-        alert(res?.error || "Tausch fehlgeschlagen");
-      }
+    if (drawnCard == null) return;
+    socket.emit("swap", { roomId, index, drawnCard }, () => {
+      setDrawnCard(null);
     });
   };
 
   const discardDrawn = () => {
-    if (drawnCard == null) {
-      alert("Keine gezogene Karte zum Abwerfen");
-      return;
-    }
-
-    socket.emit("swap", { roomId, index: -1, drawnCard }, (res) => {
-      console.log("discard resp:", res);
-      if (res?.ok) {
-        // if it's a special and server returns specialAction, the client will handle it
-        setDrawnCard(null);
-      } else {
-        alert(res?.error || "Abwerfen fehlgeschlagen");
-      }
+    if (drawnCard == null) return;
+    socket.emit("swap", { roomId, index: -1, drawnCard }, () => {
+      setDrawnCard(null);
     });
   };
 
   const peekTwo = () => {
-    if (!myHand.length) return;
-
     const ids = myHand.slice(0, 2).map((c) => c.id);
     setRevealedIds(new Set(ids));
-    // tell server optionally (server can track peekUsed if implemented)
-    socket.emit("peekUsed", { roomId }, () => {});
   };
 
-  const currentPlayer = publicState?.players?.[publicState.turnIndex] || null;
-  const currentName = publicState?.names?.[currentPlayer] || "—";
+  /* ================= SPECIAL ACTIONS ================= */
+
+  const handleOwnPeek = (index) => {
+    socket.emit("specialResolve", {
+      roomId,
+      payload: { index },
+    });
+    setSpecial(null);
+  };
+
+  const handleOpponentPeek = (index) => {
+    socket.emit("specialResolve", {
+      roomId,
+      payload: { index },
+    });
+    setSpecial(null);
+  };
+
+  const handleSwapSelectOwn = (index) => {
+    setSelectedOwn(index);
+  };
+
+  const handleSwapSelectOpponent = (index) => {
+    socket.emit("specialResolve", {
+      roomId,
+      payload: { ownIndex: selectedOwn, oppIndex: index },
+    });
+    setSelectedOwn(null);
+    setSpecial(null);
+  };
+
+  /* ================= RENDER ================= */
+
+  const currentPlayer =
+    publicState?.players?.[publicState.turnIndex] || null;
+
+  const currentName =
+    publicState?.names?.[currentPlayer] || "—";
+
+  const opponentId =
+    publicState?.players?.find((p) => p !== socket.id);
 
   return (
     <div className="card-box">
@@ -185,26 +129,102 @@ export default function Game({ socket, roomId, name, leave }) {
         <button onClick={() => takeFrom("discard")}>
           Ablage ({publicState?.discardTop ?? "—"})
         </button>
-        <button onClick={discardDrawn}>Gezogene abwerfen</button>
+        <button onClick={discardDrawn}>
+          Gezogene abwerfen
+        </button>
         <button onClick={leave}>Zur Lobby</button>
       </div>
 
-      {/* Gegner oben */}
+      {/* Gegner */}
       <div style={{ marginTop: 20 }}>
-        {(publicState?.players || [])
-          .filter((p) => p !== socket.id)
-          .map((p) => (
-            <Opponent
-              key={p}
-              name={publicState?.names?.[p]}
-              count={publicState?.playerCardsCount?.[p] ?? 4}
-            />
+        <h3>{publicState?.names?.[opponentId]}</h3>
+        <div style={{ display: "flex", gap: 10 }}>
+          {Array.from({
+            length:
+              publicState?.playerCardsCount?.[opponentId] ?? 4,
+          }).map((_, i) => (
+            <div key={i} style={{ textAlign: "center" }}>
+              <div
+                style={{
+                  width: 50,
+                  height: 70,
+                  background: "#ddd",
+                  borderRadius: 8,
+                }}
+              />
+              {special === "peekOpponent" && (
+                <button
+                  onClick={() =>
+                    handleOpponentPeek(i)
+                  }
+                >
+                  Anschauen
+                </button>
+              )}
+              {special === "swapOpponent" &&
+                selectedOwn !== null && (
+                  <button
+                    onClick={() =>
+                      handleSwapSelectOpponent(i)
+                    }
+                  >
+                    Tauschen
+                  </button>
+                )}
+            </div>
           ))}
+        </div>
       </div>
 
-      {/* Eigene Karten unten */}
+      {/* Eigene Karten */}
       <div style={{ marginTop: 20 }}>
-        <Hand hand={myHand} onSwap={swapWith} revealedIds={revealedIds} />
+        <h3>Dein Blatt</h3>
+        <div style={{ display: "flex", gap: 10 }}>
+          {myHand.map((c, i) => {
+            const revealed =
+              revealedIds.has(c.id) || c.revealed;
+            return (
+              <div key={c.id} style={{ textAlign: "center" }}>
+                <div
+                  style={{
+                    border: "1px solid black",
+                    width: 60,
+                    height: 80,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 8,
+                    background: "#fff",
+                  }}
+                  onClick={() => swapWith(i)}
+                >
+                  {revealed ? c.value : "verdeckt"}
+                </div>
+
+                {special === "peekOwn" && (
+                  <button
+                    onClick={() =>
+                      handleOwnPeek(i)
+                    }
+                  >
+                    Anschauen
+                  </button>
+                )}
+
+                {special === "swapOpponent" &&
+                  selectedOwn === null && (
+                    <button
+                      onClick={() =>
+                        handleSwapSelectOwn(i)
+                      }
+                    >
+                      Auswählen
+                    </button>
+                  )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div style={{ marginTop: 10 }}>
