@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from "react";
-import Hand from "./Hand";
-import Opponent from "./Opponent";
 
 export default function Game({ socket, roomId, leave }) {
   const [publicState, setPublicState] = useState(null);
@@ -11,10 +9,14 @@ export default function Game({ socket, roomId, leave }) {
   const [special, setSpecial] = useState(null);
   const [selectedOwn, setSelectedOwn] = useState(null);
 
-  // 🔥 Neue States für Startkarten
+  // Startkarten
   const [initialPeekMode, setInitialPeekMode] = useState(false);
   const [initialPeekSelection, setInitialPeekSelection] = useState([]);
   const [initialPeekDone, setInitialPeekDone] = useState(false);
+
+  // Claim Pair
+  const [claimMode, setClaimMode] = useState(false);
+  const [claimSelection, setClaimSelection] = useState([]);
 
   /* ================= SOCKET ================= */
 
@@ -22,12 +24,10 @@ export default function Game({ socket, roomId, leave }) {
     socket.on("stateUpdate", setPublicState);
     socket.on("yourHand", setMyHand);
 
-socket.on("specialAction", (data) => {
-  // 🔥 gezogene Karte sofort löschen
-  setDrawnCard(null);
-
-  setSpecial(data.type);
-});
+    socket.on("specialAction", (data) => {
+      setDrawnCard(null);
+      setSpecial(data.type);
+    });
 
     socket.on("revealOwn", (d) => {
       alert("Deine Karte: " + d.value);
@@ -37,10 +37,17 @@ socket.on("specialAction", (data) => {
       alert("Gegnerkarte: " + d.value);
     });
 
+    socket.on("claimResult", (d) => {
+      if (d.correct)
+        alert("Richtig! Zwei gleiche Karten entfernt.");
+      else alert("Falsch! Strafkarte erhalten.");
+      setClaimMode(false);
+      setClaimSelection([]);
+    });
+
     socket.emit("roomInfo", roomId, (res) => {
-      if (res?.ok && res.publicState) {
+      if (res?.ok && res.publicState)
         setPublicState(res.publicState);
-      }
     });
 
     return () => {
@@ -49,6 +56,7 @@ socket.on("specialAction", (data) => {
       socket.off("specialAction");
       socket.off("revealOwn");
       socket.off("revealOpponent");
+      socket.off("claimResult");
     };
   }, [socket, roomId]);
 
@@ -64,12 +72,11 @@ socket.on("specialAction", (data) => {
     if (!initialPeekMode) return;
     if (initialPeekSelection.includes(cardId)) return;
 
-    const newSelection = [...initialPeekSelection, cardId];
-    setInitialPeekSelection(newSelection);
+    const newSel = [...initialPeekSelection, cardId];
+    setInitialPeekSelection(newSel);
 
-    if (newSelection.length === 2) {
-      setRevealedIds(new Set(newSelection));
-
+    if (newSel.length === 2) {
+      setRevealedIds(new Set(newSel));
       setTimeout(() => {
         setRevealedIds(new Set());
         setInitialPeekMode(false);
@@ -100,12 +107,41 @@ socket.on("specialAction", (data) => {
     });
   };
 
+  /* ================= CLAIM PAIR ================= */
+
+  const startClaimMode = () => {
+    setClaimMode(true);
+    setClaimSelection([]);
+  };
+
+  const toggleClaim = (index) => {
+    if (!claimMode) return;
+
+    if (claimSelection.includes(index)) {
+      setClaimSelection(claimSelection.filter(i => i !== index));
+      return;
+    }
+
+    if (claimSelection.length >= 2) return;
+
+    const newSel = [...claimSelection, index];
+    setClaimSelection(newSel);
+
+    if (newSel.length === 2) {
+      socket.emit("claimResolve", {
+        roomId,
+        idxA: newSel[0],
+        idxB: newSel[1]
+      });
+    }
+  };
+
   /* ================= SPECIAL ================= */
 
   const handleOwnPeek = (index) => {
     socket.emit("specialResolve", {
       roomId,
-      payload: { index },
+      payload: { index }
     });
     setSpecial(null);
   };
@@ -113,7 +149,7 @@ socket.on("specialAction", (data) => {
   const handleOpponentPeek = (index) => {
     socket.emit("specialResolve", {
       roomId,
-      payload: { index },
+      payload: { index }
     });
     setSpecial(null);
   };
@@ -125,7 +161,7 @@ socket.on("specialAction", (data) => {
   const handleSwapSelectOpponent = (index) => {
     socket.emit("specialResolve", {
       roomId,
-      payload: { ownIndex: selectedOwn, oppIndex: index },
+      payload: { ownIndex: selectedOwn, oppIndex: index }
     });
     setSelectedOwn(null);
     setSpecial(null);
@@ -140,7 +176,7 @@ socket.on("specialAction", (data) => {
     publicState?.names?.[currentPlayer] || "—";
 
   const opponentId =
-    publicState?.players?.find((p) => p !== socket.id);
+    publicState?.players?.find(p => p !== socket.id);
 
   return (
     <div className="card-box">
@@ -170,6 +206,10 @@ socket.on("specialAction", (data) => {
           Gezogene abwerfen
         </button>
 
+        <button onClick={startClaimMode}>
+          Zwei gleiche melden
+        </button>
+
         <button onClick={leave}>
           Zur Lobby
         </button>
@@ -180,18 +220,15 @@ socket.on("specialAction", (data) => {
         <h3>{publicState?.names?.[opponentId]}</h3>
         <div style={{ display: "flex", gap: 10 }}>
           {Array.from({
-            length:
-              publicState?.playerCardsCount?.[opponentId] ?? 4,
+            length: publicState?.playerCardsCount?.[opponentId] ?? 4
           }).map((_, i) => (
-            <div key={i} style={{ textAlign: "center" }}>
-              <div
-                style={{
-                  width: 50,
-                  height: 70,
-                  background: "#ddd",
-                  borderRadius: 8,
-                }}
-              />
+            <div key={i}>
+              <div style={{
+                width: 50,
+                height: 70,
+                background: "#ddd",
+                borderRadius: 8
+              }} />
 
               {special === "peekOpponent" && (
                 <button onClick={() => handleOpponentPeek(i)}>
@@ -199,16 +236,11 @@ socket.on("specialAction", (data) => {
                 </button>
               )}
 
-              {special === "swapOpponent" &&
-                selectedOwn !== null && (
-                  <button
-                    onClick={() =>
-                      handleSwapSelectOpponent(i)
-                    }
-                  >
-                    Tauschen
-                  </button>
-                )}
+              {special === "swapOpponent" && selectedOwn !== null && (
+                <button onClick={() => handleSwapSelectOpponent(i)}>
+                  Tauschen
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -222,26 +254,32 @@ socket.on("specialAction", (data) => {
             const revealed =
               revealedIds.has(c.id) || c.revealed;
 
+            const isClaimSelected =
+              claimSelection.includes(i);
+
             return (
-              <div key={c.id} style={{ textAlign: "center" }}>
+              <div key={c.id}>
                 <div
                   style={{
                     border: "1px solid black",
                     width: 60,
                     height: 80,
+                    borderRadius: 8,
+                    background: isClaimSelected
+                      ? "#ffe082"
+                      : "#fff",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    borderRadius: 8,
-                    background: "#fff",
-                    cursor: "pointer",
+                    cursor: "pointer"
                   }}
                   onClick={() => {
-                    if (initialPeekMode) {
+                    if (initialPeekMode)
                       handleInitialPeekClick(c.id);
-                    } else {
+                    else if (claimMode)
+                      toggleClaim(i);
+                    else
                       swapWith(i);
-                    }
                   }}
                 >
                   {revealed ? c.value : "verdeckt"}
@@ -253,16 +291,11 @@ socket.on("specialAction", (data) => {
                   </button>
                 )}
 
-                {special === "swapOpponent" &&
-                  selectedOwn === null && (
-                    <button
-                      onClick={() =>
-                        handleSwapSelectOwn(i)
-                      }
-                    >
-                      Auswählen
-                    </button>
-                  )}
+                {special === "swapOpponent" && selectedOwn === null && (
+                  <button onClick={() => handleSwapSelectOwn(i)}>
+                    Auswählen
+                  </button>
+                )}
               </div>
             );
           })}
