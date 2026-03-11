@@ -1,4 +1,11 @@
 import React, { useEffect, useState } from "react";
+const getCardImage = (value) => {
+  return new URL(`../assets/cards/card${value}.jpeg`, import.meta.url).href;
+};
+
+const getBackImage = () => {
+  return new URL(`../assets/cards/back.jpeg`, import.meta.url).href;
+};
 
 export default function Game({ socket, roomId, leave }) {
   const [publicState, setPublicState] = useState(null);
@@ -239,7 +246,20 @@ const handleSwapSelectOpponent = (index) => {
             borderRadius: 12,
             border: isSelectable ? "3px solid gold" : "none",
             cursor: isSelectable ? "pointer" : "default",
-            background: isRevealed ? "#fff" : "#bbb",
+            background: isRevealed ? <img
+  src={
+    revealedOpponentIndex === i
+      ? getCardImage(lastPeekValue)
+      : getBackImage()
+  }
+  alt="card"
+  style={{
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+    borderRadius: 12
+  }}
+/>,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -370,7 +390,16 @@ const handleSwapSelectOpponent = (index) => {
             cursor: gameOver ? "default" : "pointer"
           }}
         >
-          {revealed ? c.value : "verdeckt"}
+         <img
+  src={revealed ? getCardImage(c.value) : getBackImage()}
+  alt="card"
+  style={{
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+    borderRadius: 18
+  }}
+/> 
         </div>
       );
     })}
