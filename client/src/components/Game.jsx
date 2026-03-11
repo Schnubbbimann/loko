@@ -64,6 +64,36 @@ export default function Game({ socket, roomId, leave }) {
       socket.off("roundResult");
     };
   }, [socket, roomId]);
+  /* ================= SPECIAL ================= */
+
+const handleOwnPeek = (index) => {
+  socket.emit("specialResolve", {
+    roomId,
+    payload: { index }
+  });
+  setSpecial(null);
+};
+
+const handleOpponentPeek = (index) => {
+  socket.emit("specialResolve", {
+    roomId,
+    payload: { index }
+  });
+  setSpecial(null);
+};
+
+const handleSwapSelectOwn = (index) => {
+  setSelectedOwn(index);
+};
+
+const handleSwapSelectOpponent = (index) => {
+  socket.emit("specialResolve", {
+    roomId,
+    payload: { ownIndex: selectedOwn, oppIndex: index }
+  });
+  setSelectedOwn(null);
+  setSpecial(null);
+};
 
   const peekTwo = () => {
     if (initialPeekDone) return;
