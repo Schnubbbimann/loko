@@ -233,12 +233,14 @@ io.on("connection", (socket) => {
     }
 
     if (v === 9 || v === 10) {
-      // peek opponent
-      const opponent = game.players.find(p => p !== socket.id);
-      const idx = payload.index;
-      const card = game.getPrivateHand(opponent)[idx];
-      if (card) io.to(socket.id).emit("revealOpponent", { value: card.value });
-    }
+  // peek opponent
+  const opponent = game.players.find(p => p !== socket.id);
+  const idx = Number(payload.index);
+  const card = game.getPrivateHand(opponent)[idx];
+  if (card) {
+    // send value + index so client can highlight the correct slot
+    io.to(socket.id).emit("revealOpponent", { value: card.value, index: idx });
+  }
 
     if (v === 11 || v === 12) {
       // swap opponent: swap values in internal hands
