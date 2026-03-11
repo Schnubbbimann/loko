@@ -274,6 +274,7 @@ export default function Game({ socket, roomId, leave }) {
                   cursor: isSelectable ? "pointer" : "default",
                   overflow: "hidden",
                   display: "flex",
+                  flexDirection: "row-reverse",
                   alignItems: "center",
                   justifyContent: "center"
                 }}
