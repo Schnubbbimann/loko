@@ -30,11 +30,13 @@ class CaboGame {
       this.lastDrawSource[pid] = null;
 
       for (let i = 0; i < 4; i++) {
-        this.playerState[pid].hand.push(this.deck.pop());
+        this.playerState[pid].hand.push(
+          this.deck.pop()
+        );
       }
     });
 
-    // erste Karte auf Ablage
+    // Erste Ablagekarte
     this.discard.push(this.deck.pop());
   }
 
@@ -77,19 +79,23 @@ class CaboGame {
   drawCard() {
     if (this.deck.length === 0) {
 
-      if (this.discard.length <= 1)
-        return null;
+      if (this.discard.length > 1) {
 
-      const topCard =
-        this.discard[this.discard.length - 1];
+        const topCard =
+          this.discard[this.discard.length - 1];
 
-      const newDeck =
-        this.discard.slice(0, this.discard.length - 1);
+        const newDeck =
+          this.discard.slice(0, this.discard.length - 1);
 
-      this.shuffle(newDeck);
+        this.shuffle(newDeck);
 
-      this.deck = newDeck;
-      this.discard = [topCard];
+        this.deck = newDeck;
+        this.discard = [topCard];
+
+      } else {
+        // Keine Karten mehr verfügbar
+        return undefined;
+      }
     }
 
     return this.deck.pop();
@@ -107,14 +113,13 @@ class CaboGame {
       revealed: false
     };
 
-    // alte Karte korrekt oben auf Ablage
+    // Alte Karte oben auf Ablage
     this.discard.push(oldCard);
   }
 
   /* ================= CLAIM ================= */
 
   claimPair(playerId, idxA, idxB) {
-
     const hand = this.playerState[playerId].hand;
 
     if (!hand[idxA] || !hand[idxB] || idxA === idxB)
@@ -135,6 +140,7 @@ class CaboGame {
       this.discard.push(removedHigh);
 
       const newCard = this.drawCard();
+
       if (newCard) {
         hand.push({
           id: uuidv4(),
@@ -146,7 +152,9 @@ class CaboGame {
       return { ok: true, correct: true };
     }
 
+    // Strafkarte
     const penalty = this.drawCard();
+
     if (penalty) {
       hand.push({
         id: uuidv4(),
