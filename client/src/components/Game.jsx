@@ -19,6 +19,10 @@ export default function Game({ socket, roomId, leave }) {
   const [roundResult, setRoundResult] = useState(null);
   const [gameOver, setGameOver] = useState(false);
 
+  // visuelle Kurzaufdeckung der gegnerischen Karte
+const [revealedOpponentIndex, setRevealedOpponentIndex] = useState(null);
+const [lastPeekValue, setLastPeekValue] = useState(null);
+
   useEffect(() => {
     socket.on("stateUpdate", setPublicState);
     socket.on("yourHand", setMyHand);
@@ -32,9 +36,6 @@ export default function Game({ socket, roomId, leave }) {
       alert("Deine Karte: " + d.value);
     });
 
-    socket.on("revealOpponent", (d) => {
-      alert("Gegnerkarte: " + d.value);
-    });
 
     socket.on("claimResult", (d) => {
       if (d.correct)
@@ -52,7 +53,22 @@ export default function Game({ socket, roomId, leave }) {
     socket.emit("roomInfo", roomId, (res) => {
       if (res?.ok && res.publicState)
         setPublicState(res.publicState);
+      
     });
+
+  socket.on("revealOpponent", (d) => {
+  // d: { value: number, index: number }
+  if (!d) return;
+
+  setLastPeekValue(d.value);
+  setRevealedOpponentIndex(d.index);
+
+  // nach 2 Sekunden wieder schließen
+  setTimeout(() => {
+    setRevealedOpponentIndex(null);
+    setLastPeekValue(null);
+  }, 2000);
+});
 
     return () => {
       socket.off("stateUpdate");
@@ -188,7 +204,7 @@ const handleSwapSelectOpponent = (index) => {
         </div>
       </div>
 
-     {/* Gegner */}
+    {/* Gegner */}
 <div style={{ marginTop: 20 }}>
   <h3>{publicState?.names?.[opponentId]}</h3>
 
@@ -200,6 +216,8 @@ const handleSwapSelectOpponent = (index) => {
       const isSelectable =
         special === "peekOpponent" ||
         (special === "swapOpponent" && selectedOwn !== null);
+
+      const isRevealed = revealedOpponentIndex === i;
 
       return (
         <div
@@ -218,12 +236,18 @@ const handleSwapSelectOpponent = (index) => {
           style={{
             width: 70,
             height: 110,
-            background: "#bbb",
             borderRadius: 12,
             border: isSelectable ? "3px solid gold" : "none",
-            cursor: isSelectable ? "pointer" : "default"
+            cursor: isSelectable ? "pointer" : "default",
+            background: isRevealed ? "#fff" : "#bbb",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22
           }}
-        />
+        >
+          {isRevealed ? lastPeekValue : ""}
+        </div>
       );
     })}
   </div>
