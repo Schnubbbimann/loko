@@ -111,14 +111,14 @@ io.on("connection", (socket) => {
 
     if (from === "deck") {
       card = game.drawCard();
+      if (!card) return cb && cb({ ok: false });
       game.lastDrawSource[socket.id] = "deck";
     }
 
     if (from === "discard") {
-      if (game.discard.length === 0)
+      if (!game.discard.length)
         return cb && cb({ ok: false });
 
-      // 🔥 STACK: genau EIN pop
       card = game.discard.pop();
       game.lastDrawSource[socket.id] = "discard";
     }
@@ -138,36 +138,38 @@ io.on("connection", (socket) => {
     if (game.getCurrentPlayer() !== socket.id)
       return cb && cb({ ok: false });
 
-    const isSpecial = drawnCard >= 7 && drawnCard <= 12;
+    const isSpecial =
+      drawnCard &&
+      drawnCard.value >= 7 &&
+      drawnCard.value <= 12;
+
     const wasFromDeck =
       game.lastDrawSource &&
       game.lastDrawSource[socket.id] === "deck";
 
-    // 🔥 Spezial nur bei Deck + direkt ablegen
+    // Spezial nur bei Deck + direkt ablegen
     if (index === -1 && isSpecial && wasFromDeck) {
 
-      // Karte EINMALIG auf Ablage legen
       game.discard.push(drawnCard);
 
       let type = null;
-      if (drawnCard === 7 || drawnCard === 8)
+
+      if (drawnCard.value === 7 || drawnCard.value === 8)
         type = "peekOwn";
-      if (drawnCard === 9 || drawnCard === 10)
+      if (drawnCard.value === 9 || drawnCard.value === 10)
         type = "peekOpponent";
-      if (drawnCard === 11 || drawnCard === 12)
+      if (drawnCard.value === 11 || drawnCard.value === 12)
         type = "swapOpponent";
 
       game.pendingSpecial = {
         player: socket.id,
-        value: drawnCard
+        value: drawnCard.value
       };
 
       io.to(socket.id).emit("specialAction", { type });
 
       return cb && cb({ ok: true });
     }
-
-    // Normales Verhalten
 
     if (index === -1) {
       game.discard.push(drawnCard);
@@ -183,7 +185,7 @@ io.on("connection", (socket) => {
     cb && cb({ ok: true });
   });
 
-  /* ================= CLAIM (ZUGOPTION C) ================= */
+  /* ================= CLAIM ================= */
 
   socket.on("claimResolve", ({ roomId, idxA, idxB }, cb) => {
     const room = roomManager.getRoom(roomId);
@@ -193,64 +195,18 @@ io.on("connection", (socket) => {
     if (game.getCurrentPlayer() !== socket.id)
       return cb && cb({ ok: false });
 
-    const internalHand = game.playerState[socket.id].hand;
+    const result =
+      game.claimPair(socket.id, idxA, idxB);
 
-    if (!internalHand[idxA] || !internalHand[idxB] || idxA === idxB)
-      return cb && cb({ ok: false });
-
-    const valA = internalHand[idxA].value;
-    const valB = internalHand[idxB].value;
-
-    if (valA === valB) {
-      const high = Math.max(idxA, idxB);
-      const low = Math.min(idxA, idxB);
-
-      const removedHigh = internalHand.splice(high, 1)[0];
-      const removedLow = internalHand.splice(low, 1)[0];
-
-      // 🔥 Reihenfolge korrekt als Stack
-      game.discard.push(removedLow.value);
-      game.discard.push(removedHigh.value);
-
-      const newCard = game.drawCard();
-      internalHand.push({
-        id: Date.now().toString(),
-        value: newCard,
-        revealed: false
-      });
-
-      io.to(socket.id).emit("claimResult", { correct: true });
-    } else {
-      const penalty = game.drawCard();
-      internalHand.push({
-        id: Date.now().toString(),
-        value: penalty,
-        revealed: false
-      });
-
-      io.to(socket.id).emit("claimResult", { correct: false });
-    }
+    io.to(socket.id).emit("claimResult", {
+      correct: result.correct
+    });
 
     game.hasDrawn[socket.id] = false;
     game.nextTurn();
     broadcastState(roomId);
 
     cb && cb({ ok: true });
-  });
-
-  /* ================= DISCONNECT ================= */
-
-  socket.on("disconnect", () => {
-    for (const roomId of Object.keys(roomManager.rooms)) {
-      const room = roomManager.rooms[roomId];
-      if (room.players.includes(socket.id)) {
-        roomManager.leaveRoom(roomId, socket.id);
-        io.to(roomId).emit("roomUpdate", {
-          players: room.players.length,
-          names: room.names
-        });
-      }
-    }
   });
 
   /* ================= BROADCAST ================= */
@@ -267,7 +223,10 @@ io.on("connection", (socket) => {
     });
 
     room.players.forEach(pid => {
-      io.to(pid).emit("yourHand", game.getPrivateHand(pid));
+      io.to(pid).emit(
+        "yourHand",
+        game.getPrivateHand(pid)
+      );
     });
   }
 });
