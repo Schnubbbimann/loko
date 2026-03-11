@@ -270,7 +270,7 @@ const handleSwapSelectOpponent = (index) => {
     })}
   </div>
 </div>
-    {/* MITTE */}
+   {/* MITTE */}
 <div style={{
   display: "flex",
   justifyContent: "center",
@@ -279,13 +279,17 @@ const handleSwapSelectOpponent = (index) => {
 }}>
 
   {/* Nachziehstapel */}
-  <div style={{
-    width: 90,
-    height: 140,
-    borderRadius: 14,
-    overflow: "hidden",
-    boxShadow: "0 6px 15px rgba(0,0,0,0.2)"
-  }}>
+  <div
+    onClick={() => takeFrom("deck")}
+    style={{
+      width: 90,
+      height: 140,
+      borderRadius: 14,
+      overflow: "hidden",
+      boxShadow: "0 6px 15px rgba(0,0,0,0.2)",
+      cursor: gameOver ? "default" : "pointer"
+    }}
+  >
     <img
       src={getBackImage()}
       alt="deck"
@@ -298,13 +302,17 @@ const handleSwapSelectOpponent = (index) => {
   </div>
 
   {/* Ablagestapel */}
-  <div style={{
-    width: 90,
-    height: 140,
-    borderRadius: 14,
-    overflow: "hidden",
-    boxShadow: "0 6px 15px rgba(0,0,0,0.2)"
-  }}>
+  <div
+    onClick={() => takeFrom("discard")}
+    style={{
+      width: 90,
+      height: 140,
+      borderRadius: 14,
+      overflow: "hidden",
+      boxShadow: "0 6px 15px rgba(0,0,0,0.2)",
+      cursor: gameOver ? "default" : "pointer"
+    }}
+  >
     {typeof publicState?.discardTop === "number" ? (
       <img
         src={getCardImage(publicState.discardTop)}
@@ -328,14 +336,57 @@ const handleSwapSelectOpponent = (index) => {
     )}
   </div>
 
-  {/* Rechte Buttons */}
+  {/* RECHTE SEITE */}
   <div style={{
     display: "flex",
     flexDirection: "column",
-    gap: 20
+    gap: 20,
+    alignItems: "center"
   }}>
-    ...
+
+    {/* CABO */}
+    <button
+      disabled={
+        publicState?.players?.[publicState.turnIndex] !== socket.id ||
+        myHasDrawn ||
+        gameOver
+      }
+      onClick={() => socket.emit("callCabo", roomId)}
+      style={{
+        width: 130,
+        height: 130,
+        borderRadius: "50%",
+        background: "#6f42c1",
+        color: "white",
+        fontSize: 18,
+        border: "none"
+      }}
+    >
+      CABO
+    </button>
+
+    {/* Doppelt ablegen */}
+    <button
+      onClick={startClaimMode}
+      disabled={gameOver}
+      style={{
+        padding: "10px 20px",
+        borderRadius: 20,
+        background: "#6f42c1",
+        color: "white",
+        border: "none"
+      }}
+    >
+      Doppelt ablegen
+    </button>
+
+    {/* Zur Lobby */}
+    <button onClick={leave}>
+      Zur Lobby
+    </button>
+
   </div>
+
 </div>
   {/* Eigene Karten */}
 <div style={{ marginTop: 20 }}>
