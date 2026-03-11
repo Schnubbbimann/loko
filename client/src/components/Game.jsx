@@ -9,20 +9,15 @@ export default function Game({ socket, roomId, leave }) {
   const [special, setSpecial] = useState(null);
   const [selectedOwn, setSelectedOwn] = useState(null);
 
-  // Startkarten
   const [initialPeekMode, setInitialPeekMode] = useState(false);
   const [initialPeekSelection, setInitialPeekSelection] = useState([]);
   const [initialPeekDone, setInitialPeekDone] = useState(false);
 
-  // Claim Pair
   const [claimMode, setClaimMode] = useState(false);
   const [claimSelection, setClaimSelection] = useState([]);
 
-  // Round result (after cabo/finish)
   const [roundResult, setRoundResult] = useState(null);
   const [gameOver, setGameOver] = useState(false);
-
-  /* ================= SOCKET ================= */
 
   useEffect(() => {
     socket.on("stateUpdate", setPublicState);
@@ -70,8 +65,6 @@ export default function Game({ socket, roomId, leave }) {
     };
   }, [socket, roomId]);
 
-  /* ================= STARTKARTEN ================= */
-
   const peekTwo = () => {
     if (initialPeekDone) return;
     setInitialPeekMode(true);
@@ -95,8 +88,6 @@ export default function Game({ socket, roomId, leave }) {
     }
   };
 
-  /* ================= NORMAL ACTIONS ================= */
-
   const takeFrom = (from) => {
     if (gameOver) return;
     socket.emit("take", { roomId, from }, (res) => {
@@ -106,7 +97,7 @@ export default function Game({ socket, roomId, leave }) {
 
   const swapWith = (index) => {
     if (gameOver) return;
-    if (drawnCard == null) return;
+    if (!drawnCard) return;
     socket.emit("swap", { roomId, index, drawnCard }, () => {
       setDrawnCard(null);
     });
@@ -114,79 +105,11 @@ export default function Game({ socket, roomId, leave }) {
 
   const discardDrawn = () => {
     if (gameOver) return;
-    if (drawnCard == null) return;
+    if (!drawnCard) return;
     socket.emit("swap", { roomId, index: -1, drawnCard }, () => {
       setDrawnCard(null);
     });
   };
-
-  /* ================= CLAIM PAIR ================= */
-
-  const startClaimMode = () => {
-    if (gameOver) return;
-    setClaimMode(true);
-    setClaimSelection([]);
-  };
-
-  const toggleClaim = (index) => {
-    if (gameOver) return;
-    if (!claimMode) return;
-
-    if (claimSelection.includes(index)) {
-      setClaimSelection(claimSelection.filter(i => i !== index));
-      return;
-    }
-
-    if (claimSelection.length >= 2) return;
-
-    const newSel = [...claimSelection, index];
-    setClaimSelection(newSel);
-
-    if (newSel.length === 2) {
-      socket.emit("claimResolve", {
-        roomId,
-        idxA: newSel[0],
-        idxB: newSel[1]
-      });
-    }
-  };
-
-  /* ================= SPECIAL ================= */
-
-  const handleOwnPeek = (index) => {
-    if (gameOver) return;
-    socket.emit("specialResolve", {
-      roomId,
-      payload: { index }
-    });
-    setSpecial(null);
-  };
-
-  const handleOpponentPeek = (index) => {
-    if (gameOver) return;
-    socket.emit("specialResolve", {
-      roomId,
-      payload: { index }
-    });
-    setSpecial(null);
-  };
-
-  const handleSwapSelectOwn = (index) => {
-    if (gameOver) return;
-    setSelectedOwn(index);
-  };
-
-  const handleSwapSelectOpponent = (index) => {
-    if (gameOver) return;
-    socket.emit("specialResolve", {
-      roomId,
-      payload: { ownIndex: selectedOwn, oppIndex: index }
-    });
-    setSelectedOwn(null);
-    setSpecial(null);
-  };
-
-  /* ================= RENDER ================= */
 
   const currentPlayer =
     publicState?.players?.[publicState.turnIndex] || null;
@@ -197,169 +120,182 @@ export default function Game({ socket, roomId, leave }) {
   const opponentId =
     publicState?.players?.find(p => p !== socket.id);
 
-  // can press CABO only if:
-  // - you're current player
-  // - you haven't drawn/taken any action this turn (checked via publicState.playerHasDrawn)
   const myHasDrawn =
     publicState?.playerHasDrawn?.[socket.id] ?? false;
 
   return (
-    <div className="card-box">
-      <h2>Spiel</h2>
+    <div style={{
+      height: "100vh",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "space-between",
+      padding: 30,
+      background: "#f3f3f3"
+    }}>
 
-      <div>
-        <strong>Am Zug: {currentName}</strong>
+      {/* TOP */}
+      <div style={{ textAlign: "center" }}>
+        <h3>Am Zug: {currentName}</h3>
+
+        <div style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: 10,
+          marginTop: 10
+        }}>
+          <button onClick={peekTwo} disabled={initialPeekDone || gameOver}>
+            2 Karten anschauen
+          </button>
+          <button onClick={() => takeFrom("deck")} disabled={gameOver}>
+            Nachziehstapel ({publicState?.deckCount ?? 0})
+          </button>
+          <button onClick={() => takeFrom("discard")} disabled={gameOver}>
+            Ablage ({publicState?.discardTop ?? "—"})
+          </button>
+          <button onClick={discardDrawn} disabled={gameOver}>
+            Abwerfen
+          </button>
+        </div>
       </div>
 
-      <div style={{ marginTop: 10 }}>
-        <button
-          onClick={peekTwo}
-          disabled={initialPeekDone || gameOver}
-        >
-          2 Karten anschauen
-        </button>
+      {/* GEGNER */}
+      <div style={{
+        display: "flex",
+        justifyContent: "center",
+        gap: 20
+      }}>
+        {Array.from({
+          length: publicState?.playerCardsCount?.[opponentId] ?? 4
+        }).map((_, i) => (
+          <div key={i}
+            style={{
+              width: 70,
+              height: 110,
+              background: "#bbb",
+              borderRadius: 12
+            }}
+          />
+        ))}
+      </div>
 
-        <button onClick={() => takeFrom("deck")} disabled={gameOver}>
-          Nachziehstapel ({publicState?.deckCount ?? 0})
-        </button>
+      {/* MITTE */}
+      <div style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        gap: 120
+      }}>
+        <div style={{
+          width: 90,
+          height: 140,
+          background: "#999",
+          borderRadius: 14
+        }} />
 
-        <button onClick={() => takeFrom("discard")} disabled={gameOver}>
-          Ablage ({publicState?.discardTop ?? "—"})
-        </button>
+        <div style={{
+          width: 90,
+          height: 140,
+          background: "#fff",
+          borderRadius: 14,
+          border: "2px solid #bbb",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 24
+        }}>
+          {publicState?.discardTop ?? ""}
+        </div>
 
-        <button onClick={discardDrawn} disabled={gameOver}>
-          Gezogene abwerfen
-        </button>
-
-        <button onClick={startClaimMode} disabled={gameOver}>
-          Zwei gleiche melden
-        </button>
-
-        <button
-          disabled={
-            // disabled if not your turn or you already did an action this turn or round finished
-            publicState?.players?.[publicState.turnIndex] !== socket.id ||
-            myHasDrawn ||
-            !!roundResult ||
-            gameOver
-          }
-          onClick={() => socket.emit("callCabo", roomId, (res) => {
-            // optional: handle cb
-            if (!res?.ok) {
-              // console.log("callCabo failed", res);
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 20
+        }}>
+          <button
+            disabled={
+              publicState?.players?.[publicState.turnIndex] !== socket.id ||
+              myHasDrawn ||
+              gameOver
             }
-          })}
-        >
-          CABO
-        </button>
+            onClick={() => socket.emit("callCabo", roomId)}
+            style={{
+              width: 130,
+              height: 130,
+              borderRadius: "50%",
+              background: "#6f42c1",
+              color: "white",
+              fontSize: 18,
+              border: "none"
+            }}
+          >
+            CABO
+          </button>
 
-        <button onClick={leave} disabled={false}>
-          Zur Lobby
-        </button>
+          <button
+            style={{
+              padding: "10px 20px",
+              borderRadius: 20,
+              background: "#6f42c1",
+              color: "white",
+              border: "none"
+            }}
+          >
+            Doppelt ablegen
+          </button>
+
+          <button onClick={leave}>
+            Zur Lobby
+          </button>
+        </div>
       </div>
 
-      {/* Gegner */}
-      <div style={{ marginTop: 20 }}>
-        <h3>{publicState?.names?.[opponentId]}</h3>
-        <div style={{ display: "flex", gap: 10 }}>
-          {Array.from({
-            length: publicState?.playerCardsCount?.[opponentId] ?? 4
-          }).map((_, i) => (
-            <div key={i}>
-              <div style={{
-                width: 50,
-                height: 70,
+      {/* EIGENE KARTEN */}
+      <div style={{
+        display: "flex",
+        justifyContent: "center",
+        gap: 30
+      }}>
+        {myHand.map((c, i) => {
+          const revealed =
+            revealedIds.has(c.id) || c.revealed;
+
+          return (
+            <div key={c.id}
+              style={{
+                width: 110,
+                height: 170,
                 background: "#ddd",
-                borderRadius: 8
-              }} />
-
-              {special === "peekOpponent" && !gameOver && (
-                <button onClick={() => handleOpponentPeek(i)}>
-                  Anschauen
-                </button>
-              )}
-
-              {special === "swapOpponent" && selectedOwn !== null && !gameOver && (
-                <button onClick={() => handleSwapSelectOpponent(i)}>
-                  Tauschen
-                </button>
-              )}
+                borderRadius: 18,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 28,
+                cursor: gameOver ? "default" : "pointer"
+              }}
+              onClick={() => {
+                if (gameOver) return;
+                swapWith(i);
+              }}
+            >
+              {revealed ? c.value : ""}
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      {/* Eigene Karten */}
-      <div style={{ marginTop: 20 }}>
-        <h3>Dein Blatt</h3>
-        <div style={{ display: "flex", gap: 10 }}>
-          {myHand.map((c, i) => {
-            const revealed =
-              revealedIds.has(c.id) || c.revealed;
-
-            const isClaimSelected =
-              claimSelection.includes(i);
-
-            return (
-              <div key={c.id}>
-                <div
-                  style={{
-                    border: "1px solid black",
-                    width: 60,
-                    height: 80,
-                    borderRadius: 8,
-                    background: isClaimSelected
-                      ? "#ffe082"
-                      : "#fff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: gameOver ? "default" : "pointer"
-                  }}
-                  onClick={() => {
-                    if (gameOver) return;
-                    if (initialPeekMode)
-                      handleInitialPeekClick(c.id);
-                    else if (claimMode)
-                      toggleClaim(i);
-                    else
-                      swapWith(i);
-                  }}
-                >
-                  {revealed ? c.value : "verdeckt"}
-                </div>
-
-                {special === "peekOwn" && !gameOver && (
-                  <button onClick={() => handleOwnPeek(i)}>
-                    Anschauen
-                  </button>
-                )}
-
-                {special === "swapOpponent" && selectedOwn === null && !gameOver && (
-                  <button onClick={() => handleSwapSelectOwn(i)}>
-                    Auswählen
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div style={{ marginTop: 10 }}>
-        Gezogene Karte: {drawnCard ? drawnCard.value : "—"}
-      </div>
-
-      {/* Winning / round result panel */}
+      {/* RESULT */}
       {gameOver && roundResult && (
         <div style={{
-          marginTop: 20,
-          padding: 16,
-          borderRadius: 8,
-          background: "#fff3cd",
-          border: "1px solid #ffe08a"
+          position: "absolute",
+          top: "30%",
+          left: "50%",
+          transform: "translate(-50%,-50%)",
+          background: "white",
+          padding: 30,
+          borderRadius: 20,
+          boxShadow: "0 10px 40px rgba(0,0,0,0.3)"
         }}>
-          <h3>🎉 Runde beendet 🎉</h3>
+          <h3>Runde beendet</h3>
 
           {Object.entries(roundResult.results).map(([p, pts]) => (
             <div key={p}>
@@ -367,17 +303,14 @@ export default function Game({ socket, roomId, leave }) {
             </div>
           ))}
 
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 10 }}>
             <strong>
               Gewinner: {publicState?.names?.[roundResult.winner]}
             </strong>
           </div>
 
-          <div style={{ marginTop: 12 }}>
-            
-
-            <button style={{ marginLeft: 8 }} onClick={() => {
-              // leave to lobby if user wants
+          <div style={{ marginTop: 15 }}>
+            <button onClick={() => {
               setRoundResult(null);
               setGameOver(false);
               leave();
@@ -387,6 +320,7 @@ export default function Game({ socket, roomId, leave }) {
           </div>
         </div>
       )}
+
     </div>
   );
 }
