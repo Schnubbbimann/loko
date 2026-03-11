@@ -1,4 +1,3 @@
-// server/gameEngine.js
 const { v4: uuidv4 } = require("uuid");
 
 class CaboGame {
@@ -12,39 +11,32 @@ class CaboGame {
     this.playerState = {};
     this.pendingSpecial = null;
 
-    // Zugkontrolle
     this.hasDrawn = {};
     this.lastDrawSource = {};
 
-    this.setup();
+    this.setupRound();
   }
 
   /* ================= SETUP ================= */
 
-  setup() {
+  setupRound() {
     this.deck = this.createDeck();
     this.shuffle(this.deck);
-
     this.discard = [];
 
-    this.players.forEach(player => {
-      this.playerState[player] = { hand: [] };
+    this.players.forEach(pid => {
+      this.playerState[pid] = { hand: [] };
+      this.hasDrawn[pid] = false;
+      this.lastDrawSource[pid] = null;
 
       for (let i = 0; i < 4; i++) {
-        this.playerState[player].hand.push(
-          this.deck.pop()
-        );
+        this.playerState[pid].hand.push(this.deck.pop());
       }
-
-      this.hasDrawn[player] = false;
-      this.lastDrawSource[player] = null;
     });
 
-    // Erste Ablagekarte
+    // erste Karte auf Ablage
     this.discard.push(this.deck.pop());
   }
-
-  /* ================= DECK ================= */
 
   createDeck() {
     const deck = [];
@@ -69,11 +61,24 @@ class CaboGame {
     }
   }
 
+  /* ================= TURN ================= */
+
+  getCurrentPlayer() {
+    return this.players[this.turnIndex];
+  }
+
+  nextTurn() {
+    this.turnIndex =
+      (this.turnIndex + 1) % this.players.length;
+  }
+
+  /* ================= DRAW ================= */
+
   drawCard() {
     if (this.deck.length === 0) {
 
-      // Nur reshufflen wenn mehr als 1 Karte auf Ablage
-      if (this.discard.length <= 1) return null;
+      if (this.discard.length <= 1)
+        return null;
 
       const topCard =
         this.discard[this.discard.length - 1];
@@ -90,21 +95,9 @@ class CaboGame {
     return this.deck.pop();
   }
 
-  /* ================= GAME FLOW ================= */
-
-  getCurrentPlayer() {
-    return this.players[this.turnIndex];
-  }
-
-  nextTurn() {
-    this.turnIndex =
-      (this.turnIndex + 1) % this.players.length;
-  }
-
   /* ================= HAND ================= */
 
   replaceCard(playerId, index, newCard) {
-
     const oldCard =
       this.playerState[playerId].hand[index];
 
@@ -114,7 +107,7 @@ class CaboGame {
       revealed: false
     };
 
-    // Alte Karte korrekt oben auf Ablage
+    // alte Karte korrekt oben auf Ablage
     this.discard.push(oldCard);
   }
 
@@ -138,7 +131,6 @@ class CaboGame {
       const removedHigh = hand.splice(high, 1)[0];
       const removedLow = hand.splice(low, 1)[0];
 
-      // Stack korrekt
       this.discard.push(removedLow);
       this.discard.push(removedHigh);
 
@@ -154,7 +146,6 @@ class CaboGame {
       return { ok: true, correct: true };
     }
 
-    // Strafkarte
     const penalty = this.drawCard();
     if (penalty) {
       hand.push({
