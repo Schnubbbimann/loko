@@ -249,7 +249,7 @@ export default function Game({ socket, roomId, leave }) {
         </div>
       </div>
 
-     {/* EIGENE KARTEN */}
+   {/* EIGENE KARTEN */}
 <div style={{
   display: "flex",
   justifyContent: "center",
@@ -277,11 +277,12 @@ export default function Game({ socket, roomId, leave }) {
         }}
         onClick={() => {
           if (gameOver) return;
+
           if (initialPeekMode)
             handleInitialPeekClick(c.id);
           else if (claimMode)
             toggleClaim(i);
-          else
+          else if (drawnCard)
             swapWith(i);
         }}
       >
