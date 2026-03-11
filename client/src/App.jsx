@@ -15,20 +15,15 @@ export default function App() {
     socket.on("gameStarted", () => {
       setGameStarted(true);
     });
-    socket.on("roundResult", () => {
-      // nach Runde optional aufs Lobby zurücksetzen oder WaitingRoom bleiben — hier behalten wir roomId
-      setGameStarted(false);
-    });
+
+    // ❌ WICHTIG: roundResult setzt NICHT mehr gameStarted auf false
+    // Dadurch bleiben wir im Game-Screen
+
     return () => {
       socket.off("gameStarted");
-      socket.off("roundResult");
     };
   }, []);
 
-  // flow:
-  // no roomId -> show Lobby (create/join)
-  // roomId && !gameStarted -> show WaitingRoom (players list, start button appears only when 2 players)
-  // roomId && gameStarted -> show Game
   return (
     <div className="app">
       <header>
@@ -36,7 +31,12 @@ export default function App() {
       </header>
 
       {!roomId ? (
-        <Lobby socket={socket} setRoomId={setRoomId} name={name} setName={setName} />
+        <Lobby
+          socket={socket}
+          setRoomId={setRoomId}
+          name={name}
+          setName={setName}
+        />
       ) : !gameStarted ? (
         <WaitingRoom
           socket={socket}
@@ -49,7 +49,15 @@ export default function App() {
           onStart={() => setGameStarted(true)}
         />
       ) : (
-        <Game socket={socket} roomId={roomId} name={name} leave={() => { setRoomId(null); setGameStarted(false); }} />
+        <Game
+          socket={socket}
+          roomId={roomId}
+          name={name}
+          leave={() => {
+            setRoomId(null);
+            setGameStarted(false);
+          }}
+        />
       )}
     </div>
   );
