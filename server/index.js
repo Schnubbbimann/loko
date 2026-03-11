@@ -1,3 +1,4 @@
+// server/index.js (mit Debug-Logging für discard)
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -16,7 +17,13 @@ app.get("*", (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
+// helper to pretty-print discard for logs
+function dumpDiscard(game) {
+  return Array.isArray(game.discard) ? game.discard.slice() : [];
+}
+
 io.on("connection", (socket) => {
+  console.log("Connected:", socket.id);
 
   /* ================= ROOM ================= */
 
@@ -26,12 +33,10 @@ io.on("connection", (socket) => {
     socket.join(roomId);
 
     const room = roomManager.getRoom(roomId);
-
     io.to(roomId).emit("roomUpdate", {
       players: room.players.length,
       names: room.names
     });
-
     cb && cb({ ok: true });
   });
 
@@ -54,9 +59,7 @@ io.on("connection", (socket) => {
     const room = roomManager.getRoom(roomId);
     if (!room) return cb && cb({ ok: false });
 
-    const publicState = room.game
-      ? room.game.getPublicState()
-      : null;
+    const publicState = room.game ? room.game.getPublicState() : null;
 
     cb && cb({
       ok: true,
@@ -79,6 +82,7 @@ io.on("connection", (socket) => {
 
     roomManager.startGame(roomId);
 
+    // init tracking structures for this game
     room.game.hasDrawn = {};
     room.game.lastDrawSource = {};
 
@@ -112,19 +116,20 @@ io.on("connection", (socket) => {
     if (from === "deck") {
       card = game.drawCard();
       game.lastDrawSource[socket.id] = "deck";
-    }
-
-    if (from === "discard") {
-      if (!game.discard.length)
+      console.log(`[take] ${socket.id} drew from deck => ${card}`);
+    } else if (from === "discard") {
+      if (game.discard.length === 0)
         return cb && cb({ ok: false });
 
-      // echtes Stack-Verhalten
+      // EXACT ONE pop
       card = game.discard.pop();
       game.lastDrawSource[socket.id] = "discard";
+      console.log(`[take] ${socket.id} drew from discard => ${card} ; new discard(top->last):`, dumpDiscard(game));
+    } else {
+      return cb && cb({ ok: false });
     }
 
     game.hasDrawn[socket.id] = true;
-
     cb && cb({ ok: true, card });
   });
 
@@ -138,44 +143,39 @@ io.on("connection", (socket) => {
     if (game.getCurrentPlayer() !== socket.id)
       return cb && cb({ ok: false });
 
-    const isSpecial = drawnCard.value >= 7 && drawnCard.value <= 12;
-    const wasFromDeck =
-      game.lastDrawSource &&
-      game.lastDrawSource[socket.id] === "deck";
+    const isSpecial = drawnCard >= 7 && drawnCard <= 12;
+    const wasFromDeck = game.lastDrawSource && game.lastDrawSource[socket.id] === "deck";
 
-    // Spezial nur bei Deck + direkt ablegen
+    // SPECIAL: only trigger if card came from deck and is discarded immediately
     if (index === -1 && isSpecial && wasFromDeck) {
-
-      // Karte genau einmal auf Ablage
+      // push card once
       game.discard.push(drawnCard);
+      console.log(`[swap] ${socket.id} SPECIAL discarded ${drawnCard} -> discard now:`, dumpDiscard(game));
 
       let type = null;
-      if (drawnCard.value === 7 || drawnCard.value === 8)
-        type = "peekOwn";
-      if (drawnCard.value === 9 || drawnCard.value === 10)
-        type = "peekOpponent";
-      if (drawnCard.value === 11 || drawnCard.value === 12)
-        type = "swapOpponent";
+      if (drawnCard === 7 || drawnCard === 8) type = "peekOwn";
+      if (drawnCard === 9 || drawnCard === 10) type = "peekOpponent";
+      if (drawnCard === 11 || drawnCard === 12) type = "swapOpponent";
 
-      game.pendingSpecial = {
-        player: socket.id,
-        value: drawnCard.value
-      };
-
+      game.pendingSpecial = { player: socket.id, value: drawnCard };
       io.to(socket.id).emit("specialAction", { type });
 
       return cb && cb({ ok: true });
     }
 
-    // normales Abwerfen
+    // Normal behavior
     if (index === -1) {
       game.discard.push(drawnCard);
+      console.log(`[swap] ${socket.id} discarded ${drawnCard} -> discard now:`, dumpDiscard(game));
     } else {
+      // replaceCard should handle pushing the old card into discard; we log around it
+      const before = dumpDiscard(game);
       game.replaceCard(socket.id, index, drawnCard);
+      const after = dumpDiscard(game);
+      console.log(`[swap] ${socket.id} replaced index ${index} with ${drawnCard} ; discard before:`, before, " after:", after);
     }
 
     game.hasDrawn[socket.id] = false;
-
     game.nextTurn();
     broadcastState(roomId);
 
@@ -187,45 +187,34 @@ io.on("connection", (socket) => {
   socket.on("specialResolve", ({ roomId, payload }, cb) => {
     const room = roomManager.getRoom(roomId);
     const game = room?.game;
-
-    if (!game || !game.pendingSpecial)
-      return cb && cb({ ok: false });
+    if (!game || !game.pendingSpecial) return cb && cb({ ok: false });
 
     const v = game.pendingSpecial.value;
     delete game.pendingSpecial;
 
     if (v === 7 || v === 8) {
-      const card =
-        game.getPrivateHand(socket.id)[payload.index];
-      io.to(socket.id).emit("revealOwn", {
-        value: card.value
-      });
+      const card = game.getPrivateHand(socket.id)[payload.index];
+      io.to(socket.id).emit("revealOwn", { value: card.value });
     }
 
     if (v === 9 || v === 10) {
-      const opponent =
-        game.players.find(p => p !== socket.id);
-      const card =
-        game.getPrivateHand(opponent)[payload.index];
-      io.to(socket.id).emit("revealOpponent", {
-        value: card.value
-      });
+      const opponent = game.players.find((p) => p !== socket.id);
+      const card = game.getPrivateHand(opponent)[payload.index];
+      io.to(socket.id).emit("revealOpponent", { value: card.value });
     }
 
     if (v === 11 || v === 12) {
-      const opponent =
-        game.players.find(p => p !== socket.id);
-
-      const ownCard =
-        game.playerState[socket.id].hand[payload.ownIndex];
-      const oppCard =
-        game.playerState[opponent].hand[payload.oppIndex];
-
+      const opponent = game.players.find((p) => p !== socket.id);
+      const ownCard = game.playerState[socket.id].hand[payload.ownIndex];
+      const oppCard = game.playerState[opponent].hand[payload.oppIndex];
       const tmp = ownCard.value;
       ownCard.value = oppCard.value;
       oppCard.value = tmp;
+      console.log(`[specialResolve] ${socket.id} swapped with ${opponent}; discard now:`, dumpDiscard(game));
     }
 
+    // special ends the turn
+    game.hasDrawn = game.hasDrawn || {};
     game.hasDrawn[socket.id] = false;
     game.nextTurn();
     broadcastState(roomId);
@@ -238,57 +227,69 @@ io.on("connection", (socket) => {
   socket.on("claimResolve", ({ roomId, idxA, idxB }, cb) => {
     const room = roomManager.getRoom(roomId);
     const game = room?.game;
+    if (!game) return cb && cb({ ok: false, error: "no game" });
 
-    if (!game) return cb && cb({ ok: false });
     if (game.getCurrentPlayer() !== socket.id)
-      return cb && cb({ ok: false });
+      return cb && cb({ ok: false, error: "not your turn" });
 
-    const hand = game.playerState[socket.id].hand;
+    idxA = parseInt(idxA, 10);
+    idxB = parseInt(idxB, 10);
+    if (!Number.isFinite(idxA) || !Number.isFinite(idxB) || idxA === idxB)
+      return cb && cb({ ok: false, error: "invalid indices" });
 
-    if (!hand[idxA] || !hand[idxB] || idxA === idxB)
-      return cb && cb({ ok: false });
+    const hand = game.getPrivateHand(socket.id);
+    if (!hand || hand.length < 2)
+      return cb && cb({ ok: false, error: "not enough cards" });
 
-    const valA = hand[idxA].value;
-    const valB = hand[idxB].value;
+    if (idxA < 0 || idxA >= hand.length || idxB < 0 || idxB >= hand.length)
+      return cb && cb({ ok: false, error: "index out of range" });
+
+    const internalHand = game.playerState && game.playerState[socket.id] && game.playerState[socket.id].hand
+      ? game.playerState[socket.id].hand
+      : null;
+
+    if (!internalHand) return cb && cb({ ok: false, error: "server internal hand missing" });
+
+    const valA = internalHand[idxA].value;
+    const valB = internalHand[idxB].value;
 
     if (valA === valB) {
-
       const high = Math.max(idxA, idxB);
       const low = Math.min(idxA, idxB);
+      const removedHigh = internalHand.splice(high, 1)[0];
+      const removedLow = internalHand.splice(low, 1)[0];
 
-      const removedHigh = hand.splice(high, 1)[0];
-      const removedLow = hand.splice(low, 1)[0];
-
-      // Stack korrekt
-      game.discard.push(removedLow);
-      game.discard.push(removedHigh);
+      // push both values to discard in the order of removal -> which makes removedHigh top
+      game.discard.push(removedLow.value);
+      game.discard.push(removedHigh.value);
+      console.log(`[claimResolve] ${socket.id} correct claim, pushed ${removedLow.value}, ${removedHigh.value} -> discard:`, dumpDiscard(game));
 
       const newCard = game.drawCard();
-      hand.push({
-        id: Date.now().toString(),
-        value: newCard.value,
-        revealed: false
-      });
+      internalHand.push({ id: Date.now().toString(), value: newCard, revealed: false });
 
       io.to(socket.id).emit("claimResult", { correct: true });
 
-    } else {
+      game.hasDrawn = game.hasDrawn || {};
+      game.hasDrawn[socket.id] = false;
+      game.nextTurn();
+      broadcastState(roomId);
 
-      const penalty = game.drawCard();
-      hand.push({
-        id: Date.now().toString(),
-        value: penalty.value,
-        revealed: false
-      });
-
-      io.to(socket.id).emit("claimResult", { correct: false });
+      return cb && cb({ ok: true, correct: true });
     }
 
+    // incorrect
+    const penalty = game.drawCard();
+    internalHand.push({ id: Date.now().toString(), value: penalty, revealed: false });
+    console.log(`[claimResolve] ${socket.id} incorrect claim, penalty ${penalty} -> discard:`, dumpDiscard(game));
+
+    io.to(socket.id).emit("claimResult", { correct: false });
+
+    game.hasDrawn = game.hasDrawn || {};
     game.hasDrawn[socket.id] = false;
     game.nextTurn();
     broadcastState(roomId);
 
-    cb && cb({ ok: true });
+    return cb && cb({ ok: true, correct: false });
   });
 
   /* ================= DISCONNECT ================= */
@@ -307,12 +308,11 @@ io.on("connection", (socket) => {
     }
   });
 
-  /* ================= BROADCAST ================= */
+  /* ================= STATE BROADCAST ================= */
 
   function broadcastState(roomId) {
     const room = roomManager.getRoom(roomId);
     if (!room || !room.game) return;
-
     const game = room.game;
 
     io.to(roomId).emit("stateUpdate", {
@@ -321,10 +321,7 @@ io.on("connection", (socket) => {
     });
 
     room.players.forEach(pid => {
-      io.to(pid).emit(
-        "yourHand",
-        game.getPrivateHand(pid)
-      );
+      io.to(pid).emit("yourHand", game.getPrivateHand(pid));
     });
   }
 });
