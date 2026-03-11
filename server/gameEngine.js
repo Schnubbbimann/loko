@@ -13,6 +13,9 @@ class CaboGame {
     this.phase = "playing";
     this.caboCalledBy = null;
 
+    // Diese Felder werden in index.js verwendet/initialisiert:
+    // this.hasDrawn = {}; this.lastDrawSource = {};
+
     this.setupRound();
   }
 
@@ -84,26 +87,26 @@ class CaboGame {
 
   /* ================= DRAW ================= */
 
-drawCard() {
-  if (this.deck.length === 0) {
+  drawCard() {
+    if (this.deck.length === 0) {
 
-    if (this.discard.length <= 1)
-      return null;
+      if (this.discard.length <= 1)
+        return null;
 
-    const topCard =
-      this.discard[this.discard.length - 1];
+      const topCard =
+        this.discard[this.discard.length - 1];
 
-    const newDeck =
-      this.discard.slice(0, this.discard.length - 1);
+      const newDeck =
+        this.discard.slice(0, this.discard.length - 1);
 
-    this.shuffle(newDeck);
+      this.shuffle(newDeck);
 
-    this.deck = newDeck;
-    this.discard = [topCard];
+      this.deck = newDeck;
+      this.discard = [topCard];
+    }
+
+    return this.deck.pop();
   }
-
-  return this.deck.pop();
-}
 
   /* ================= HAND ================= */
 
@@ -184,6 +187,8 @@ drawCard() {
   /* ================= STATE ================= */
 
   getPublicState() {
+    // include hasDrawn mapping if available so client can disable CABO correctly
+    const playerHasDrawn = this.hasDrawn || {};
     return {
       players: this.players,
       turnIndex: this.turnIndex,
@@ -196,7 +201,8 @@ drawCard() {
           p,
           this.playerState[p].hand.length
         ])
-      )
+      ),
+      playerHasDrawn
     };
   }
 
