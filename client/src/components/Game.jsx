@@ -303,7 +303,7 @@ export default function Game({ socket, roomId, leave }) {
       </div>
 
       <div style={{ marginTop: 10 }}>
-        Gezogene Karte: {drawnCard ?? "—"}
+    Gezogene Karte: {drawnCard ? drawnCard.value : "—"}
       </div>
     </div>
   );
