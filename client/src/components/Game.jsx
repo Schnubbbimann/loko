@@ -277,26 +277,95 @@ const handleSwapSelectOpponent = (index) => {
         alignItems: "center",
         gap: 120
       }}>
-        <div style={{
-          width: 90,
-          height: 140,
-          background: "#999",
-          borderRadius: 14
-        }} />
+        {/* Gegner */}
+<div style={{ marginTop: 20 }}>
+  <h3>{publicState?.names?.[opponentId]}</h3>
+
+  <div style={{ display: "flex", gap: 20, justifyContent: "center" }}>
+    {Array.from({
+      length: publicState?.playerCardsCount?.[opponentId] ?? 4
+    }).map((_, i) => {
+
+      const isSelectable =
+        special === "peekOpponent" ||
+        (special === "swapOpponent" && selectedOwn !== null);
+
+      const isRevealed = revealedOpponentIndex === i;
+
+      return (
+        <div
+          key={i}
+          onClick={() => {
+            if (!isSelectable || gameOver) return;
+
+            if (special === "peekOpponent") {
+              handleOpponentPeek(i);
+            }
+
+            if (special === "swapOpponent") {
+              handleSwapSelectOpponent(i);
+            }
+          }}
+          style={{
+            width: 70,
+            height: 110,
+            borderRadius: 12,
+            border: isSelectable ? "3px solid gold" : "none",
+            cursor: isSelectable ? "pointer" : "default",
+            overflow: "hidden",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+        >
+          <img
+            src={
+              isRevealed
+                ? getCardImage(lastPeekValue)
+                : getBackImage()
+            }
+            alt="card"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain"
+            }}
+          />
+        </div>
+      );
+    })}
+  </div>
+</div>
 
         <div style={{
-          width: 90,
-          height: 140,
-          background: "#fff",
-          borderRadius: 14,
-          border: "2px solid #bbb",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 24
-        }}>
-          {publicState?.discardTop ?? ""}
-        </div>
+  width: 90,
+  height: 140,
+  borderRadius: 14,
+  overflow: "hidden",
+  boxShadow: "0 6px 15px rgba(0,0,0,0.2)"
+}}>
+  {publicState?.discardTop !== null ? (
+    <img
+      src={getCardImage(publicState.discardTop)}
+      alt="discard"
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "contain"
+      }}
+    />
+  ) : (
+    <img
+      src={getBackImage()}
+      alt="empty"
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "contain"
+      }}
+    />
+  )}
+</div>
 
         <div style={{
           display: "flex",
