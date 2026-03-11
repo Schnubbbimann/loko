@@ -84,26 +84,26 @@ class CaboGame {
 
   /* ================= DRAW ================= */
 
-  drawCard() {
-    if (this.deck.length === 0) {
+drawCard() {
+  if (this.deck.length === 0) {
 
-      if (this.discard.length <= 1)
-        return null;
+    if (this.discard.length <= 1)
+      return null;
 
-      const topCard =
-        this.discard[this.discard.length - 1];
+    const topCard =
+      this.discard[this.discard.length - 1];
 
-      const newDeck =
-        this.discard.slice(0, this.discard.length - 1);
+    const newDeck =
+      this.discard.slice(0, this.discard.length - 1);
 
-      this.shuffle(newDeck);
+    this.shuffle(newDeck);
 
-      this.deck = newDeck;
-      this.discard = [topCard];
-    }
-
-    return this.deck.pop();
+    this.deck = newDeck;
+    this.discard = [topCard];
   }
+
+  return this.deck.pop();
+}
 
   /* ================= HAND ================= */
 
