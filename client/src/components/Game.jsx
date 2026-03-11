@@ -299,39 +299,96 @@ export default function Game({ socket, roomId, leave }) {
           gap: 120
         }}
       >
-        {/* deck (back image) */}
-        <div
-          onClick={() => takeFrom("deck")}
-          style={{
-            width: 90,
-            height: 140,
-            borderRadius: 14,
-            overflow: "hidden",
-            boxShadow: "0 6px 15px rgba(0,0,0,0.2)",
-            cursor: gameOver ? "default" : "pointer"
-          }}
-        >
-          <img src={getBackImage()} alt="deck" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-        </div>
+      {/* Nachziehstapel */}
+<div
+  onClick={() => takeFrom("deck")}
+  style={{
+    position: "relative",
+    width: 100,
+    height: 150,
+    cursor: gameOver ? "default" : "pointer"
+  }}
+>
+  {[2,1,0].map((offset) => (
+    <img
+      key={offset}
+      src={getBackImage()}
+      alt="deck"
+      style={{
+        position: "absolute",
+        top: offset * 3,
+        left: offset * 3,
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+        borderRadius: 14,
+        boxShadow: "0 6px 12px rgba(0,0,0,0.25)"
+      }}
+    />
+  ))}
+</div>  
 
-        {/* discard (top card shown) */}
-        <div
-          onClick={() => takeFrom("discard")}
-          style={{
-            width: 90,
-            height: 140,
-            borderRadius: 14,
-            overflow: "hidden",
-            boxShadow: "0 6px 15px rgba(0,0,0,0.2)",
-            cursor: gameOver ? "default" : "pointer"
-          }}
-        >
-          {typeof publicState.discardTop === "number" ? (
-            <img src={getCardImage(publicState.discardTop)} alt="discard" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-          ) : (
-            <img src={getBackImage()} alt="empty" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-          )}
-        </div>
+ {/* Ablagestapel */}
+<div
+  onClick={() => takeFrom("discard")}
+  style={{
+    position: "relative",
+    width: 100,
+    height: 150,
+    cursor: gameOver ? "default" : "pointer"
+  }}
+>
+  {/* untere Karten */}
+  {[2,1].map((offset) => (
+    <img
+      key={offset}
+      src={getBackImage()}
+      alt="stack"
+      style={{
+        position: "absolute",
+        top: offset * 3,
+        left: offset * 3,
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+        borderRadius: 14,
+        opacity: 0.4
+      }}
+    />
+  ))}
+
+  {/* oberste Karte */}
+  {typeof publicState?.discardTop === "number" ? (
+    <img
+      src={getCardImage(publicState.discardTop)}
+      alt="discard"
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+        borderRadius: 14,
+        boxShadow: "0 6px 15px rgba(0,0,0,0.3)"
+      }}
+    />
+  ) : (
+    <img
+      src={getBackImage()}
+      alt="empty"
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+        borderRadius: 14
+      }}
+    />
+  )}
+</div>
 
         {/* right column controls */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20, alignItems: "center" }}>
