@@ -241,6 +241,7 @@ io.on("connection", (socket) => {
     // send value + index so client can highlight the correct slot
     io.to(socket.id).emit("revealOpponent", { value: card.value, index: idx });
   }
+      }
 
     if (v === 11 || v === 12) {
       // swap opponent: swap values in internal hands
