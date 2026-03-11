@@ -211,7 +211,7 @@ const handleSwapSelectOpponent = (index) => {
         </div>
       </div>
 
-    {/* Gegner */}
+   {/* Gegner */}
 <div style={{ marginTop: 20 }}>
   <h3>{publicState?.names?.[opponentId]}</h3>
 
@@ -246,27 +246,25 @@ const handleSwapSelectOpponent = (index) => {
             borderRadius: 12,
             border: isSelectable ? "3px solid gold" : "none",
             cursor: isSelectable ? "pointer" : "default",
-            background: isRevealed ? <img
-  src={
-    revealedOpponentIndex === i
-      ? getCardImage(lastPeekValue)
-      : getBackImage()
-  }
-  alt="card"
-  style={{
-    width: "100%",
-    height: "100%",
-    objectFit: "contain",
-    borderRadius: 12
-  }}
-/>,
+            overflow: "hidden",
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            fontSize: 22
+            justifyContent: "center"
           }}
         >
-          {isRevealed ? lastPeekValue : ""}
+          <img
+            src={
+              isRevealed
+                ? getCardImage(lastPeekValue)
+                : getBackImage()
+            }
+            alt="card"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain"
+            }}
+          />
         </div>
       );
     })}
