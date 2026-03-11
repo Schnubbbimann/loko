@@ -158,26 +158,46 @@ export default function Game({ socket, roomId, leave }) {
         </div>
       </div>
 
-      {/* GEGNER */}
-      <div style={{
-        display: "flex",
-        justifyContent: "center",
-        gap: 20
-      }}>
-        {Array.from({
-          length: publicState?.playerCardsCount?.[opponentId] ?? 4
-        }).map((_, i) => (
-          <div key={i}
-            style={{
-              width: 70,
-              height: 110,
-              background: "#bbb",
-              borderRadius: 12
-            }}
-          />
-        ))}
-      </div>
+     {/* Gegner */}
+<div style={{ marginTop: 20 }}>
+  <h3>{publicState?.names?.[opponentId]}</h3>
 
+  <div style={{ display: "flex", gap: 20, justifyContent: "center" }}>
+    {Array.from({
+      length: publicState?.playerCardsCount?.[opponentId] ?? 4
+    }).map((_, i) => {
+
+      const isSelectable =
+        special === "peekOpponent" ||
+        (special === "swapOpponent" && selectedOwn !== null);
+
+      return (
+        <div
+          key={i}
+          onClick={() => {
+            if (!isSelectable || gameOver) return;
+
+            if (special === "peekOpponent") {
+              handleOpponentPeek(i);
+            }
+
+            if (special === "swapOpponent") {
+              handleSwapSelectOpponent(i);
+            }
+          }}
+          style={{
+            width: 70,
+            height: 110,
+            background: "#bbb",
+            borderRadius: 12,
+            border: isSelectable ? "3px solid gold" : "none",
+            cursor: isSelectable ? "pointer" : "default"
+          }}
+        />
+      );
+    })}
+  </div>
+</div>
       {/* MITTE */}
       <div style={{
         display: "flex",
@@ -249,47 +269,58 @@ export default function Game({ socket, roomId, leave }) {
         </div>
       </div>
 
-   {/* EIGENE KARTEN */}
-<div style={{
-  display: "flex",
-  justifyContent: "center",
-  gap: 30
-}}>
-  {myHand.map((c, i) => {
-    const revealed =
-      revealedIds.has(c.id) || c.revealed;
+  {/* Eigene Karten */}
+<div style={{ marginTop: 20 }}>
+  <h3>Dein Blatt</h3>
 
-    const isClaimSelected =
-      claimSelection.includes(i);
+  <div style={{ display: "flex", gap: 30, justifyContent: "center" }}>
+    {myHand.map((c, i) => {
 
-    return (
-      <div key={c.id}
-        style={{
-          width: 110,
-          height: 170,
-          background: isClaimSelected ? "#ffe082" : "#ddd",
-          borderRadius: 18,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 28,
-          cursor: gameOver ? "default" : "pointer"
-        }}
-        onClick={() => {
-          if (gameOver) return;
+      const revealed =
+        revealedIds.has(c.id) || c.revealed;
 
-          if (initialPeekMode)
-            handleInitialPeekClick(c.id);
-          else if (claimMode)
-            toggleClaim(i);
-          else if (drawnCard)
-            swapWith(i);
-        }}
-      >
-        {revealed ? c.value : "verdeckt"}
-      </div>
-    );
-  })}
+      const isClaimSelected =
+        claimSelection.includes(i);
+
+      const isSelectable =
+        special === "peekOwn" ||
+        (special === "swapOpponent" && selectedOwn === null);
+
+      return (
+        <div
+          key={c.id}
+          onClick={() => {
+            if (gameOver) return;
+
+            if (initialPeekMode)
+              handleInitialPeekClick(c.id);
+            else if (claimMode)
+              toggleClaim(i);
+            else if (special === "peekOwn")
+              handleOwnPeek(i);
+            else if (special === "swapOpponent" && selectedOwn === null)
+              handleSwapSelectOwn(i);
+            else if (drawnCard)
+              swapWith(i);
+          }}
+          style={{
+            width: 110,
+            height: 170,
+            borderRadius: 18,
+            background: isClaimSelected ? "#ffe082" : "#ddd",
+            border: isSelectable ? "3px solid gold" : "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 28,
+            cursor: gameOver ? "default" : "pointer"
+          }}
+        >
+          {revealed ? c.value : "verdeckt"}
+        </div>
+      );
+    })}
+  </div>
 </div>
 
       {/* gezogene Karte sichtbar anzeigen */}
