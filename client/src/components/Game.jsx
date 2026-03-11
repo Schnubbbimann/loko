@@ -249,39 +249,52 @@ export default function Game({ socket, roomId, leave }) {
         </div>
       </div>
 
-      {/* EIGENE KARTEN */}
-      <div style={{
-        display: "flex",
-        justifyContent: "center",
-        gap: 30
-      }}>
-        {myHand.map((c, i) => {
-          const revealed =
-            revealedIds.has(c.id) || c.revealed;
+     {/* EIGENE KARTEN */}
+<div style={{
+  display: "flex",
+  justifyContent: "center",
+  gap: 30
+}}>
+  {myHand.map((c, i) => {
+    const revealed =
+      revealedIds.has(c.id) || c.revealed;
 
-          return (
-            <div key={c.id}
-              style={{
-                width: 110,
-                height: 170,
-                background: "#ddd",
-                borderRadius: 18,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 28,
-                cursor: gameOver ? "default" : "pointer"
-              }}
-              onClick={() => {
-                if (gameOver) return;
-                swapWith(i);
-              }}
-            >
-              {revealed ? c.value : ""}
-            </div>
-          );
-        })}
+    const isClaimSelected =
+      claimSelection.includes(i);
+
+    return (
+      <div key={c.id}
+        style={{
+          width: 110,
+          height: 170,
+          background: isClaimSelected ? "#ffe082" : "#ddd",
+          borderRadius: 18,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 28,
+          cursor: gameOver ? "default" : "pointer"
+        }}
+        onClick={() => {
+          if (gameOver) return;
+          if (initialPeekMode)
+            handleInitialPeekClick(c.id);
+          else if (claimMode)
+            toggleClaim(i);
+          else
+            swapWith(i);
+        }}
+      >
+        {revealed ? c.value : "verdeckt"}
       </div>
+    );
+  })}
+</div>
+
+      {/* gezogene Karte sichtbar anzeigen */}
+<div style={{ marginTop: 15, textAlign: "center", fontSize: 18 }}>
+  Gezogene Karte: {drawnCard ? (drawnCard.value ?? drawnCard) : "—"}
+</div>
 
       {/* RESULT */}
       {gameOver && roundResult && (
