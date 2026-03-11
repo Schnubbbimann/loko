@@ -270,146 +270,73 @@ const handleSwapSelectOpponent = (index) => {
     })}
   </div>
 </div>
-      {/* MITTE */}
-      <div style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        gap: 120
-      }}>
-        {/* Gegner */}
-<div style={{ marginTop: 20 }}>
-  <h3>{publicState?.names?.[opponentId]}</h3>
-
-  <div style={{ display: "flex", gap: 20, justifyContent: "center" }}>
-    {Array.from({
-      length: publicState?.playerCardsCount?.[opponentId] ?? 4
-    }).map((_, i) => {
-
-      const isSelectable =
-        special === "peekOpponent" ||
-        (special === "swapOpponent" && selectedOwn !== null);
-
-      const isRevealed = revealedOpponentIndex === i;
-
-      return (
-        <div
-          key={i}
-          onClick={() => {
-            if (!isSelectable || gameOver) return;
-
-            if (special === "peekOpponent") {
-              handleOpponentPeek(i);
-            }
-
-            if (special === "swapOpponent") {
-              handleSwapSelectOpponent(i);
-            }
-          }}
-          style={{
-            width: 70,
-            height: 110,
-            borderRadius: 12,
-            border: isSelectable ? "3px solid gold" : "none",
-            cursor: isSelectable ? "pointer" : "default",
-            overflow: "hidden",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          }}
-        >
-          <img
-            src={
-              isRevealed
-                ? getCardImage(lastPeekValue)
-                : getBackImage()
-            }
-            alt="card"
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "contain"
-            }}
-          />
-        </div>
-      );
-    })}
-  </div>
-</div>
-
-        <div style={{
-  width: 90,
-  height: 140,
-  borderRadius: 14,
-  overflow: "hidden",
-  boxShadow: "0 6px 15px rgba(0,0,0,0.2)"
+    {/* MITTE */}
+<div style={{
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  gap: 120
 }}>
-  {publicState?.discardTop !== null ? (
-    <img
-      src={getCardImage(publicState.discardTop)}
-      alt="discard"
-      style={{
-        width: "100%",
-        height: "100%",
-        objectFit: "contain"
-      }}
-    />
-  ) : (
+
+  {/* Nachziehstapel */}
+  <div style={{
+    width: 90,
+    height: 140,
+    borderRadius: 14,
+    overflow: "hidden",
+    boxShadow: "0 6px 15px rgba(0,0,0,0.2)"
+  }}>
     <img
       src={getBackImage()}
-      alt="empty"
+      alt="deck"
       style={{
         width: "100%",
         height: "100%",
         objectFit: "contain"
       }}
     />
-  )}
+  </div>
+
+  {/* Ablagestapel */}
+  <div style={{
+    width: 90,
+    height: 140,
+    borderRadius: 14,
+    overflow: "hidden",
+    boxShadow: "0 6px 15px rgba(0,0,0,0.2)"
+  }}>
+    {typeof publicState?.discardTop === "number" ? (
+      <img
+        src={getCardImage(publicState.discardTop)}
+        alt="discard"
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain"
+        }}
+      />
+    ) : (
+      <img
+        src={getBackImage()}
+        alt="empty"
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain"
+        }}
+      />
+    )}
+  </div>
+
+  {/* Rechte Buttons */}
+  <div style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: 20
+  }}>
+    ...
+  </div>
 </div>
-
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 20
-        }}>
-          <button
-            disabled={
-              publicState?.players?.[publicState.turnIndex] !== socket.id ||
-              myHasDrawn ||
-              gameOver
-            }
-            onClick={() => socket.emit("callCabo", roomId)}
-            style={{
-              width: 130,
-              height: 130,
-              borderRadius: "50%",
-              background: "#6f42c1",
-              color: "white",
-              fontSize: 18,
-              border: "none"
-            }}
-          >
-            CABO
-          </button>
-
-          <button
-            style={{
-              padding: "10px 20px",
-              borderRadius: 20,
-              background: "#6f42c1",
-              color: "white",
-              border: "none"
-            }}
-          >
-            Doppelt ablegen
-          </button>
-
-          <button onClick={leave}>
-            Zur Lobby
-          </button>
-        </div>
-      </div>
-
   {/* Eigene Karten */}
 <div style={{ marginTop: 20 }}>
   <h3>Dein Blatt</h3>
