@@ -97,29 +97,44 @@ io.on("connection", (socket) => {
 
   /* ================= TAKE CARD ================= */
 
-  socket.on("take", ({ roomId, from }, cb) => {
-    const room = roomManager.getRoom(roomId);
-    const game = room?.game;
+socket.on("take", ({ roomId, from }, cb) => {
+  const room = roomManager.getRoom(roomId);
+  const game = room?.game;
 
-    if (!game) return cb && cb({ ok: false });
-    if (game.getCurrentPlayer() !== socket.id)
+  if (!game) return cb && cb({ ok: false });
+  if (game.getCurrentPlayer() !== socket.id)
+    return cb && cb({ ok: false });
+
+  game.hasDrawn = game.hasDrawn || {};
+  game.lastDrawSource = game.lastDrawSource || {};
+
+  if (game.hasDrawn[socket.id])
+    return cb && cb({ ok: false });
+
+  let card;
+
+  if (from === "deck") {
+    card = game.drawCard();
+
+    // 🔥 WICHTIG: Schutz gegen undefined/null
+    if (!card)
       return cb && cb({ ok: false });
 
-    game.hasDrawn = game.hasDrawn || {};
-    game.lastDrawSource = game.lastDrawSource || {};
+    game.lastDrawSource[socket.id] = "deck";
+  }
 
-    if (game.hasDrawn[socket.id])
+  if (from === "discard") {
+    if (!game.discard.length)
       return cb && cb({ ok: false });
 
-    let card;
+    card = game.discard.pop();
+    game.lastDrawSource[socket.id] = "discard";
+  }
 
-    if (from === "deck") {
-      card = game.drawCard();
-      game.lastDrawSource[socket.id] = "deck";
-      console.log(`[take] ${socket.id} drew from deck => ${card}`);
-    } else if (from === "discard") {
-      if (game.discard.length === 0)
-        return cb && cb({ ok: false });
+  game.hasDrawn[socket.id] = true;
+
+  cb && cb({ ok: true, card });
+});
 
       // EXACT ONE pop
       card = game.discard.pop();
