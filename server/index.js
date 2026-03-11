@@ -93,6 +93,22 @@ io.on("connection", (socket) => {
     cb && cb({ ok: true });
   });
 
+  /* ================= helper: post-turn handling ================= */
+
+  function postTurn(roomId) {
+    const room = roomManager.getRoom(roomId);
+    if (!room || !room.game) return;
+    const game = room.game;
+
+    // If after advancing turn we are in scoring -> compute & emit results
+    if (game.phase === "scoring") {
+      const result = game.score();
+      io.to(roomId).emit("roundResult", result);
+    } else {
+      broadcastState(roomId);
+    }
+  }
+
   /* ================= TAKE CARD ================= */
 
   socket.on("take", ({ roomId, from }, cb) => {
@@ -185,10 +201,11 @@ io.on("connection", (socket) => {
       game.replaceCard(socket.id, index, drawnCard);
     }
 
-    // end of action: reset draw flag, next turn and broadcast
+    // end of action: reset draw flag, next turn and postTurn
+    game.hasDrawn = game.hasDrawn || {};
     game.hasDrawn[socket.id] = false;
     game.nextTurn();
-    broadcastState(roomId);
+    postTurn(roomId);
 
     cb && cb({ ok: true });
   });
@@ -246,7 +263,7 @@ io.on("connection", (socket) => {
     game.hasDrawn = game.hasDrawn || {};
     game.hasDrawn[socket.id] = false;
     game.nextTurn();
-    broadcastState(roomId);
+    postTurn(roomId);
 
     cb && cb({ ok: true });
   });
@@ -315,7 +332,32 @@ io.on("connection", (socket) => {
     game.hasDrawn = game.hasDrawn || {};
     game.hasDrawn[socket.id] = false;
     game.nextTurn();
-    broadcastState(roomId);
+    postTurn(roomId);
+
+    cb && cb({ ok: true });
+  });
+
+  /* ================= CALL CABO ================= */
+
+  socket.on("callCabo", (roomId, cb) => {
+    const room = roomManager.getRoom(roomId);
+    const game = room?.game;
+
+    if (!game) return cb && cb({ ok: false });
+    if (game.getCurrentPlayer() !== socket.id)
+      return cb && cb({ ok: false });
+
+    game.hasDrawn = game.hasDrawn || {};
+
+    // only allowed if player hasn't done anything this turn
+    if (game.hasDrawn[socket.id]) return cb && cb({ ok: false });
+
+    const ok = game.callCabo(socket.id);
+    if (!ok) return cb && cb({ ok: false });
+
+    // immediate end of this player's turn; opponent gets one final turn
+    game.nextTurn();
+    postTurn(roomId);
 
     cb && cb({ ok: true });
   });
