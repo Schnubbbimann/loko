@@ -50,14 +50,13 @@ export default function App() {
         />
       ) : (
         <Game
-          socket={socket}
-          roomId={roomId}
-          name={name}
-          leave={() => {
-            setRoomId(null);
-            setGameStarted(false);
-          }}
-        />
+  socket={socket}
+  roomId={roomId}
+  name={name}
+  leave={() => {
+    setGameStarted(false);
+  }}
+/>
       )}
     </div>
   );
