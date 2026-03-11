@@ -18,6 +18,9 @@ export default function Game({ socket, roomId, leave }) {
   const [claimMode, setClaimMode] = useState(false);
   const [claimSelection, setClaimSelection] = useState([]);
 
+  // Round result (after cabo/finish)
+  const [roundResult, setRoundResult] = useState(null);
+
   /* ================= SOCKET ================= */
 
   useEffect(() => {
@@ -45,6 +48,10 @@ export default function Game({ socket, roomId, leave }) {
       setClaimSelection([]);
     });
 
+    socket.on("roundResult", (result) => {
+      setRoundResult(result);
+    });
+
     socket.emit("roomInfo", roomId, (res) => {
       if (res?.ok && res.publicState)
         setPublicState(res.publicState);
@@ -57,6 +64,7 @@ export default function Game({ socket, roomId, leave }) {
       socket.off("revealOwn");
       socket.off("revealOpponent");
       socket.off("claimResult");
+      socket.off("roundResult");
     };
   }, [socket, roomId]);
 
@@ -178,6 +186,12 @@ export default function Game({ socket, roomId, leave }) {
   const opponentId =
     publicState?.players?.find(p => p !== socket.id);
 
+  // can press CABO only if:
+  // - you're current player
+  // - you haven't drawn/taken any action this turn (checked via publicState.playerHasDrawn)
+  const myHasDrawn =
+    publicState?.playerHasDrawn?.[socket.id] ?? false;
+
   return (
     <div className="card-box">
       <h2>Spiel</h2>
@@ -208,6 +222,24 @@ export default function Game({ socket, roomId, leave }) {
 
         <button onClick={startClaimMode}>
           Zwei gleiche melden
+        </button>
+
+        <button
+          disabled={
+            // disabled if not your turn or you already did an action this turn or round finished
+            publicState?.players?.[publicState.turnIndex] !== socket.id ||
+            myHasDrawn ||
+            !!roundResult
+          }
+          onClick={() => socket.emit("callCabo", roomId, (res) => {
+            // optional: handle cb
+            if (!res?.ok) {
+              // show a quick feedback
+              // console.log("callCabo failed", res);
+            }
+          })}
+        >
+          CABO
         </button>
 
         <button onClick={leave}>
@@ -303,8 +335,23 @@ export default function Game({ socket, roomId, leave }) {
       </div>
 
       <div style={{ marginTop: 10 }}>
-    Gezogene Karte: {drawnCard ? drawnCard.value : "—"}
+        Gezogene Karte: {drawnCard ? drawnCard.value : "—"}
       </div>
+
+      {roundResult && (
+        <div style={{ marginTop: 20 }}>
+          <h3>Runden-Ergebnis</h3>
+          {Object.entries(roundResult.results).map(([p, pts]) => (
+            <div key={p}>
+              {publicState?.names?.[p]}: {pts} Punkte
+            </div>
+          ))}
+          <strong>
+            Gewinner: {publicState?.names?.[roundResult.winner]}
+          </strong>
+        </div>
+      )}
     </div>
   );
+}
 }
