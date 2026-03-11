@@ -175,6 +175,9 @@ const handleSwapSelectOpponent = (index) => {
 
   const myHasDrawn =
     publicState?.playerHasDrawn?.[socket.id] ?? false;
+  if (!publicState) {
+  return <div style={{ padding: 40 }}>Lade Spiel...</div>;
+}
 
   return (
     <div style={{
