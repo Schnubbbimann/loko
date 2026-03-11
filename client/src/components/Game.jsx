@@ -374,19 +374,7 @@ export default function Game({ socket, roomId, leave }) {
           </div>
 
           <div style={{ marginTop: 12 }}>
-            <button onClick={() => {
-              // reset client-side state and start a new round
-              setRoundResult(null);
-              setGameOver(false);
-              socket.emit("startGame", roomId, (res) => {
-                // optional feedback
-                if (!res?.ok) {
-                  // console.log("startGame failed", res);
-                }
-              });
-            }}>
-              Neue Runde starten
-            </button>
+            
 
             <button style={{ marginLeft: 8 }} onClick={() => {
               // leave to lobby if user wants
