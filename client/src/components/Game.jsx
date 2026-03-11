@@ -163,18 +163,20 @@ const handleSwapSelectOpponent = (index) => {
       setDrawnCard(null);
     });
   };
-
+if (!publicState) {
+  return <div style={{ padding: 40 }}>Lade Spiel...</div>;
+}
   const currentPlayer =
-    publicState?.players?.[publicState.turnIndex] || null;
+  publicState.players[publicState.turnIndex] || null;
 
-  const currentName =
-    publicState?.names?.[currentPlayer] || "—";
+const currentName =
+  publicState.names?.[currentPlayer] || "—";
 
-  const opponentId =
-    publicState?.players?.find(p => p !== socket.id);
+const opponentId =
+  publicState.players.find(p => p !== socket.id);
 
-  const myHasDrawn =
-    publicState?.playerHasDrawn?.[socket.id] ?? false;
+const myHasDrawn =
+  publicState.playerHasDrawn?.[socket.id] ?? false;
   if (!publicState) {
   return <div style={{ padding: 40 }}>Lade Spiel...</div>;
 }
