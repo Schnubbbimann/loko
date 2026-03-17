@@ -174,6 +174,9 @@ io.on("connection", (socket) => {
       // push the drawn card object once onto discard
       game.discard.push(drawnCard);
 
+      // IMPORTANT: broadcast state now so everyone sees the special card on the discard pile
+      broadcastState(roomId);
+
       let type = null;
       if (drawnCard.value === 7 || drawnCard.value === 8)
         type = "peekOwn";
@@ -225,23 +228,43 @@ io.on("connection", (socket) => {
     // remove pending to prevent double-execution
     delete game.pendingSpecial;
 
+    // we'll collect cards to reveal/highlight for both players
+    const revealCards = []; // { playerId, index, value, type }
+
     if (v === 7 || v === 8) {
       // peek own
       const idx = payload.index;
       const card = game.getPrivateHand(socket.id)[idx];
-      if (card) io.to(socket.id).emit("revealOwn", { value: card.value });
+      if (card) {
+        // inform only the actor about the value (existing event)
+        io.to(socket.id).emit("revealOwn", { value: card.value });
+        // but also inform room to briefly reveal/highlight that card (so opponent sees which card was peeked)
+        revealCards.push({
+          playerId: socket.id,
+          index: idx,
+          value: card.value,
+          type: "peek"
+        });
+      }
     }
 
     if (v === 9 || v === 10) {
-  // peek opponent
-  const opponent = game.players.find(p => p !== socket.id);
-  const idx = Number(payload.index);
-  const card = game.getPrivateHand(opponent)[idx];
-  if (card) {
-    // send value + index so client can highlight the correct slot
-    io.to(socket.id).emit("revealOpponent", { value: card.value, index: idx });
-  }
+      // peek opponent
+      const opponent = game.players.find(p => p !== socket.id);
+      const idx = payload.index;
+      const card = game.getPrivateHand(opponent)[idx];
+      if (card) {
+        // actor gets the private reveal event
+        io.to(socket.id).emit("revealOpponent", { value: card.value, index: idx });
+        // room gets a tempReveal so both see which card was peeked (value + highlight)
+        revealCards.push({
+          playerId: opponent,
+          index: idx,
+          value: card.value,
+          type: "peek"
+        });
       }
+    }
 
     if (v === 11 || v === 12) {
       // swap opponent: swap values in internal hands
@@ -256,10 +279,30 @@ io.on("connection", (socket) => {
       ) {
         const ownCard = game.playerState[socket.id].hand[ownIndex];
         const oppCard = game.playerState[opponent].hand[oppIndex];
+        // swap values
         const tmp = ownCard.value;
         ownCard.value = oppCard.value;
         oppCard.value = tmp;
+
+        // after swap: reveal both cards to the room temporarily and highlight them
+        revealCards.push({
+          playerId: socket.id,
+          index: ownIndex,
+          value: ownCard.value,
+          type: "swap"
+        });
+        revealCards.push({
+          playerId: opponent,
+          index: oppIndex,
+          value: oppCard.value,
+          type: "swap"
+        });
       }
+    }
+
+    // if we have revealCards, broadcast them as a single tempReveal event to the whole room
+    if (revealCards.length > 0) {
+      io.to(roomId).emit("tempReveal", { cards: revealCards });
     }
 
     // special ends the turn
