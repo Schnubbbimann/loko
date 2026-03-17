@@ -308,7 +308,7 @@ export default function Game({ socket, roomId, leave }) {
                 }}
               >
                 <img
-                  src={isRevealed ? getCardImage(revealValue) : getBackImage()}
+                  src={getBackImage()}
                   alt="card"
                   style={{
                     width: "100%",
