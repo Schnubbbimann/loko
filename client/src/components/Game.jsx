@@ -582,4 +582,4 @@ export default function Game({ socket, roomId, leave }) {
     </div>
   );
 }
-}
+
