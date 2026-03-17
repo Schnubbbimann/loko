@@ -1,3 +1,4 @@
+// src/components/Game.jsx
 import React, { useEffect, useState } from "react";
 const getCardImage = (value) => {
   return new URL(`../assets/cards/card${value}.jpeg`, import.meta.url).href;
@@ -26,10 +27,11 @@ export default function Game({ socket, roomId, leave }) {
   const [roundResult, setRoundResult] = useState(null);
   const [gameOver, setGameOver] = useState(false);
 
-  // visuelle Kurzaufdeckung der gegnerischen Karte / temporäre Highlights
-  const [tempReveals, setTempReveals] = useState([]); // [{ playerId, index, value, type }]
-  const [revealedOpponentIndex, setRevealedOpponentIndex] = useState(null);
-  const [lastPeekValue, setLastPeekValue] = useState(null);
+  // temp reveals from server (unchanged)
+  const [tempReveals, setTempReveals] = useState([]);
+
+  // NEW: CABO banner state
+  const [caboBanner, setCaboBanner] = useState(null); // { by: playerId }
 
   useEffect(() => {
     socket.on("stateUpdate", setPublicState);
@@ -41,20 +43,17 @@ export default function Game({ socket, roomId, leave }) {
     });
 
     socket.on("revealOwn", (d) => {
-      // legacy: actor-only reveal (we keep alert for compatibility)
       if (d?.value !== undefined) alert("Deine Karte: " + d.value);
     });
 
     socket.on("revealOpponent", (d) => {
-      // legacy actor-only reveal (we keep alert)
       if (d?.value !== undefined) {
         alert("Gegnerkarte: " + d.value);
       }
     });
 
     socket.on("claimResult", (d) => {
-      if (d.correct)
-        alert("Richtig! Zwei gleiche Karten entfernt.");
+      if (d.correct) alert("Richtig! Zwei gleiche Karten entfernt.");
       else alert("Falsch! Strafkarte erhalten.");
       setClaimMode(false);
       setClaimSelection([]);
@@ -65,21 +64,21 @@ export default function Game({ socket, roomId, leave }) {
       setGameOver(true);
     });
 
-    // new: tempReveal event from server
     socket.on("tempReveal", (payload) => {
       if (!payload || !Array.isArray(payload.cards)) return;
       setTempReveals(payload.cards);
+      setTimeout(() => setTempReveals([]), 2000);
+    });
 
-      // also set convenience single-reveal states for older UI bits (optional)
-      // clear after 2s
-      setTimeout(() => {
-        setTempReveals([]);
-      }, 2000);
+    // NEW: listen for caboCalled and show banner
+    socket.on("caboCalled", (data) => {
+      setCaboBanner(data || { by: null });
+      // auto-hide after 2s
+      setTimeout(() => setCaboBanner(null), 2000);
     });
 
     socket.emit("roomInfo", roomId, (res) => {
-      if (res?.ok && res.publicState)
-        setPublicState(res.publicState);
+      if (res?.ok && res.publicState) setPublicState(res.publicState);
     });
 
     return () => {
@@ -91,6 +90,7 @@ export default function Game({ socket, roomId, leave }) {
       socket.off("claimResult");
       socket.off("roundResult");
       socket.off("tempReveal");
+      socket.off("caboCalled");
     };
   }, [socket, roomId]);
 
@@ -210,19 +210,11 @@ export default function Game({ socket, roomId, leave }) {
     return <div style={{ padding: 40 }}>Lade Spiel...</div>;
   }
 
-  const currentPlayer =
-    publicState.players?.[publicState.turnIndex] || null;
+  const currentPlayer = publicState.players?.[publicState.turnIndex] || null;
+  const currentName = publicState.names?.[currentPlayer] || "—";
+  const opponentId = publicState.players?.find(p => p !== socket.id);
+  const myHasDrawn = publicState.playerHasDrawn?.[socket.id] ?? false;
 
-  const currentName =
-    publicState.names?.[currentPlayer] || "—";
-
-  const opponentId =
-    publicState.players?.find(p => p !== socket.id);
-
-  const myHasDrawn =
-    publicState.playerHasDrawn?.[socket.id] ?? false;
-
-  // helper: check if there's a temp reveal for (playerId,index)
   const getTempReveal = (playerId, index) => {
     return tempReveals.find(r => r.playerId === playerId && Number(r.index) === Number(index));
   };
@@ -275,10 +267,8 @@ export default function Game({ socket, roomId, leave }) {
               special === "peekOpponent" ||
               (special === "swapOpponent" && selectedOwn !== null);
 
-            // check if server asked to temporarily reveal/highlight this card
             const temp = getTempReveal(opponentId, i);
             const isRevealed = !!temp;
-            const revealValue = temp?.value;
 
             return (
               <div
@@ -368,7 +358,6 @@ export default function Game({ socket, roomId, leave }) {
             cursor: gameOver ? "default" : "pointer"
           }}
         >
-          {/* lower backing cards */}
           {[2,1].map((offset) => (
             <img
               key={"under"+offset}
@@ -387,7 +376,6 @@ export default function Game({ socket, roomId, leave }) {
             />
           ))}
 
-          {/* top card (if present) */}
           {typeof publicState?.discardTop === "number" ? (
             <img
               src={getCardImage(publicState.discardTop)}
@@ -475,20 +463,12 @@ export default function Game({ socket, roomId, leave }) {
         <div style={{ display: "flex", gap: 30, justifyContent: "center" }}>
           {myHand.map((c, i) => {
 
-            const revealed =
-              revealedIds.has(c.id) || c.revealed;
-
-            // check if server instructs temporary reveal/highlight for this own card
+            const revealed = revealedIds.has(c.id) || c.revealed;
             const temp = getTempReveal(socket.id, i);
             const isTemp = !!temp;
-            const revealValue = temp?.value;
 
-            const isClaimSelected =
-              claimSelection.includes(i);
-
-            const isSelectable =
-              special === "peekOwn" ||
-              (special === "swapOpponent" && selectedOwn === null);
+            const isClaimSelected = claimSelection.includes(i);
+            const isSelectable = special === "peekOwn" || (special === "swapOpponent" && selectedOwn === null);
 
             return (
               <div
@@ -496,16 +476,11 @@ export default function Game({ socket, roomId, leave }) {
                 onClick={() => {
                   if (gameOver) return;
 
-                  if (initialPeekMode)
-                    handleInitialPeekClick(c.id);
-                  else if (claimMode)
-                    toggleClaim(i);
-                  else if (special === "peekOwn")
-                    handleOwnPeek(i);
-                  else if (special === "swapOpponent" && selectedOwn === null)
-                    handleSwapSelectOwn(i);
-                  else if (drawnCard)
-                    swapWith(i);
+                  if (initialPeekMode) handleInitialPeekClick(c.id);
+                  else if (claimMode) toggleClaim(i);
+                  else if (special === "peekOwn") handleOwnPeek(i);
+                  else if (special === "swapOpponent" && selectedOwn === null) handleSwapSelectOwn(i);
+                  else if (drawnCard) swapWith(i);
                 }}
                 style={{
                   width: 110,
@@ -577,6 +552,30 @@ export default function Game({ socket, roomId, leave }) {
               Zur Lobby
             </button>
           </div>
+        </div>
+      )}
+
+      {/* CABO Banner (NEU) */}
+      {caboBanner && (
+        <div style={{
+          position: "fixed",
+          top: 20,
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "rgba(0,0,0,0.85)",
+          color: "white",
+          padding: "12px 20px",
+          borderRadius: 12,
+          zIndex: 9999,
+          boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
+          display: "flex",
+          alignItems: "center",
+          gap: 12
+        }}>
+          <strong style={{ fontSize: 18 }}>CABO</strong>
+          <span style={{ opacity: 0.9 }}>
+            {publicState?.names?.[caboBanner.by] ? `von ${publicState.names[caboBanner.by]}` : ""}
+          </span>
         </div>
       )}
 
