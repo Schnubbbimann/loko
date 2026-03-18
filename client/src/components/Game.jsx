@@ -1,5 +1,6 @@
-// src/components/Game.jsx
+// client/src/components/Game.jsx
 import React, { useEffect, useState } from "react";
+
 const getCardImage = (value) => {
   return new URL(`../assets/cards/card${value}.jpeg`, import.meta.url).href;
 };
@@ -27,11 +28,8 @@ export default function Game({ socket, roomId, leave }) {
   const [roundResult, setRoundResult] = useState(null);
   const [gameOver, setGameOver] = useState(false);
 
-  // temp reveals from server (unchanged)
-  const [tempReveals, setTempReveals] = useState([]);
-
-  // NEW: CABO banner state
-  const [caboBanner, setCaboBanner] = useState(null); // { by: playerId }
+  // temporäre Reveal-Highlights vom Server
+  const [tempReveals, setTempReveals] = useState([]); // [{ playerId, index, value, type }]
 
   useEffect(() => {
     socket.on("stateUpdate", setPublicState);
@@ -47,9 +45,7 @@ export default function Game({ socket, roomId, leave }) {
     });
 
     socket.on("revealOpponent", (d) => {
-      if (d?.value !== undefined) {
-        alert("Gegnerkarte: " + d.value);
-      }
+      if (d?.value !== undefined) alert("Gegnerkarte: " + d.value);
     });
 
     socket.on("claimResult", (d) => {
@@ -64,17 +60,13 @@ export default function Game({ socket, roomId, leave }) {
       setGameOver(true);
     });
 
+    // tempReveal: server tells the room about cards to highlight (and optionally show value to the actor)
     socket.on("tempReveal", (payload) => {
       if (!payload || !Array.isArray(payload.cards)) return;
       setTempReveals(payload.cards);
-      setTimeout(() => setTempReveals([]), 2000);
-    });
 
-    // NEW: listen for caboCalled and show banner
-    socket.on("caboCalled", (data) => {
-      setCaboBanner(data || { by: null });
-      // auto-hide after 2s
-      setTimeout(() => setCaboBanner(null), 2000);
+      // clear after 2s
+      setTimeout(() => setTempReveals([]), 2000);
     });
 
     socket.emit("roomInfo", roomId, (res) => {
@@ -90,42 +82,46 @@ export default function Game({ socket, roomId, leave }) {
       socket.off("claimResult");
       socket.off("roundResult");
       socket.off("tempReveal");
-      socket.off("caboCalled");
     };
   }, [socket, roomId]);
 
-  /* ================= SPECIAL ACTION HELPERS (client sends payloads) ================ */
+  /* ============== helper functions ============== */
+
+  // convert UI index (0 = left-most on screen) to internal server index (0 = left-most in internal hand)
+  // For opponent we render the cards mirrored, so UI-index i maps to internal index (count-1 - i)
+  const uiIndexToInternal = (uiIndex, playerId) => {
+    const count = publicState?.playerCardsCount?.[playerId] ?? 0;
+    return Math.max(0, (count - 1) - uiIndex);
+  };
+
+  const getTempReveal = (playerId, index) => {
+    return tempReveals.find(r => r.playerId === playerId && Number(r.index) === Number(index));
+  };
+
+  /* ============== action handlers (send payloads) ============== */
 
   const handleOwnPeek = (index) => {
-    socket.emit("specialResolve", {
-      roomId,
-      payload: { index }
-    });
+    socket.emit("specialResolve", { roomId, payload: { index } });
     setSpecial(null);
   };
 
   const handleOpponentPeek = (index) => {
-    socket.emit("specialResolve", {
-      roomId,
-      payload: { index }
-    });
+    socket.emit("specialResolve", { roomId, payload: { index } });
     setSpecial(null);
   };
 
   const handleSwapSelectOwn = (index) => {
+    // selectedOwn should be internal index (server's ordering) — we assume own hand ordering matches server
     setSelectedOwn(index);
   };
 
   const handleSwapSelectOpponent = (index) => {
-    socket.emit("specialResolve", {
-      roomId,
-      payload: { ownIndex: selectedOwn, oppIndex: index }
-    });
+    socket.emit("specialResolve", { roomId, payload: { ownIndex: selectedOwn, oppIndex: index } });
     setSelectedOwn(null);
     setSpecial(null);
   };
 
-  /* ================= START / PEEK / DRAW / SWAP ================= */
+  /* ============== standard game actions ============== */
 
   const peekTwo = () => {
     if (initialPeekDone) return;
@@ -160,20 +156,14 @@ export default function Game({ socket, roomId, leave }) {
   const swapWith = (index) => {
     if (gameOver) return;
     if (!drawnCard) return;
-    socket.emit("swap", { roomId, index, drawnCard }, () => {
-      setDrawnCard(null);
-    });
+    socket.emit("swap", { roomId, index, drawnCard }, () => setDrawnCard(null));
   };
 
   const discardDrawn = () => {
     if (gameOver) return;
     if (!drawnCard) return;
-    socket.emit("swap", { roomId, index: -1, drawnCard }, () => {
-      setDrawnCard(null);
-    });
+    socket.emit("swap", { roomId, index: -1, drawnCard }, () => setDrawnCard(null));
   };
-
-  /* ================= CLAIM (doppelt ablegen) ================ */
 
   const startClaimMode = () => {
     if (gameOver) return;
@@ -196,29 +186,20 @@ export default function Game({ socket, roomId, leave }) {
     setClaimSelection(newSel);
 
     if (newSel.length === 2) {
-      socket.emit("claimResolve", {
-        roomId,
-        idxA: newSel[0],
-        idxB: newSel[1]
-      });
+      socket.emit("claimResolve", { roomId, idxA: newSel[0], idxB: newSel[1] });
     }
   };
 
-  /* ================= RENDER HELPERS ================= */
+  /* ============== render guards ============== */
 
-  if (!publicState) {
-    return <div style={{ padding: 40 }}>Lade Spiel...</div>;
-  }
+  if (!publicState) return <div style={{ padding: 40 }}>Lade Spiel...</div>;
 
   const currentPlayer = publicState.players?.[publicState.turnIndex] || null;
   const currentName = publicState.names?.[currentPlayer] || "—";
   const opponentId = publicState.players?.find(p => p !== socket.id);
   const myHasDrawn = publicState.playerHasDrawn?.[socket.id] ?? false;
 
-  const getTempReveal = (playerId, index) => {
-    return tempReveals.find(r => r.playerId === playerId && Number(r.index) === Number(index));
-  };
-
+  /* ============== UI ============== */
   return (
     <div style={{
       height: "100vh",
@@ -239,18 +220,10 @@ export default function Game({ socket, roomId, leave }) {
           gap: 10,
           marginTop: 10
         }}>
-          <button onClick={peekTwo} disabled={initialPeekDone || gameOver}>
-            2 Karten anschauen
-          </button>
-          <button onClick={() => takeFrom("deck")} disabled={gameOver}>
-            Nachziehstapel ({publicState?.deckCount ?? 0})
-          </button>
-          <button onClick={() => takeFrom("discard")} disabled={gameOver}>
-            Ablage ({publicState?.discardTop ?? "—"})
-          </button>
-          <button onClick={discardDrawn} disabled={gameOver}>
-            Abwerfen
-          </button>
+          <button onClick={peekTwo} disabled={initialPeekDone || gameOver}>2 Karten anschauen</button>
+          <button onClick={() => takeFrom("deck")} disabled={gameOver}>Nachziehstapel ({publicState?.deckCount ?? 0})</button>
+          <button onClick={() => takeFrom("discard")} disabled={gameOver}>Ablage ({publicState?.discardTop ?? "—"})</button>
+          <button onClick={discardDrawn} disabled={gameOver}>Abwerfen</button>
         </div>
       </div>
 
@@ -259,36 +232,29 @@ export default function Game({ socket, roomId, leave }) {
         <h3>{publicState?.names?.[opponentId]}</h3>
 
         <div style={{ display: "flex", gap: 20, justifyContent: "center" }}>
-          {Array.from({
-            length: publicState?.playerCardsCount?.[opponentId] ?? 4
-          }).map((_, i) => {
+          {Array.from({ length: publicState?.playerCardsCount?.[opponentId] ?? 4 }).map((_, uiIndex) => {
+            // map UI index -> internal index (mirror)
+            const realIndex = uiIndexToInternal(uiIndex, opponentId);
 
-            const isSelectable =
-              special === "peekOpponent" ||
-              (special === "swapOpponent" && selectedOwn !== null);
+            const isSelectable = special === "peekOpponent" || (special === "swapOpponent" && selectedOwn !== null);
 
-            const temp = getTempReveal(opponentId, i);
-            const isRevealed = !!temp;
+            // server may have instructed a temp reveal / highlight for this internal index
+            const temp = getTempReveal(opponentId, realIndex);
+            const isTemp = !!temp;
 
             return (
               <div
-                key={i}
+                key={uiIndex}
                 onClick={() => {
                   if (!isSelectable || gameOver) return;
-
-                  if (special === "peekOpponent") {
-                    handleOpponentPeek(i);
-                  }
-
-                  if (special === "swapOpponent") {
-                    handleSwapSelectOpponent(i);
-                  }
+                  if (special === "peekOpponent") handleOpponentPeek(realIndex);
+                  if (special === "swapOpponent") handleSwapSelectOpponent(realIndex);
                 }}
                 style={{
                   width: 70,
                   height: 110,
                   borderRadius: 12,
-                  border: temp ? "4px solid gold" : (isSelectable ? "3px solid gold" : "none"),
+                  border: isTemp ? "4px solid gold" : (isSelectable ? "3px solid gold" : "none"),
                   cursor: isSelectable ? "pointer" : "default",
                   overflow: "hidden",
                   display: "flex",
@@ -300,11 +266,7 @@ export default function Game({ socket, roomId, leave }) {
                 <img
                   src={getBackImage()}
                   alt="card"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "contain"
-                  }}
+                  style={{ width: "100%", height: "100%", objectFit: "contain" }}
                 />
               </div>
             );
@@ -312,167 +274,75 @@ export default function Game({ socket, roomId, leave }) {
         </div>
       </div>
 
-      {/* MITTE: Deck / Discard / Buttons */}
+      {/* CENTER: deck / discard / right controls */}
       <div style={{
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
         gap: 120
       }}>
-        {/* Nachziehstapel (visual stack) */}
-        <div
-          onClick={() => takeFrom("deck")}
-          style={{
-            width: 90,
-            height: 140,
-            position: "relative",
-            cursor: gameOver ? "default" : "pointer"
-          }}
-        >
-          {[2,1,0].map((offset) => (
-            <img
-              key={offset}
-              src={getBackImage()}
-              alt="deck"
-              style={{
-                position: "absolute",
-                top: offset * 3,
-                left: offset * 3,
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                borderRadius: 14,
-                boxShadow: "0 6px 12px rgba(0,0,0,0.25)"
-              }}
-            />
+        {/* deck (stack) */}
+        <div onClick={() => takeFrom("deck")} style={{ width: 90, height: 140, position: "relative", cursor: gameOver ? "default" : "pointer" }}>
+          {[2,1,0].map(offset => (
+            <img key={offset} src={getBackImage()} alt="deck" style={{
+              position: "absolute", top: offset * 3, left: offset * 3, width: "100%", height: "100%",
+              objectFit: "contain", borderRadius: 14, boxShadow: "0 6px 12px rgba(0,0,0,0.25)"
+            }} />
           ))}
         </div>
 
-        {/* Ablagestapel (stack visual + top card shown) */}
-        <div
-          onClick={() => takeFrom("discard")}
-          style={{
-            width: 90,
-            height: 140,
-            position: "relative",
-            cursor: gameOver ? "default" : "pointer"
-          }}
-        >
-          {[2,1].map((offset) => (
-            <img
-              key={"under"+offset}
-              src={getBackImage()}
-              alt="under"
-              style={{
-                position: "absolute",
-                top: offset * 3,
-                left: offset * 3,
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                borderRadius: 14,
-                opacity: 0.45
-              }}
-            />
+        {/* discard (stack with top card) */}
+        <div onClick={() => takeFrom("discard")} style={{ width: 90, height: 140, position: "relative", cursor: gameOver ? "default" : "pointer" }}>
+          {[2,1].map(offset => (
+            <img key={"under"+offset} src={getBackImage()} alt="under" style={{
+              position: "absolute", top: offset * 3, left: offset * 3, width: "100%", height: "100%",
+              objectFit: "contain", borderRadius: 14, opacity: 0.45
+            }} />
           ))}
 
           {typeof publicState?.discardTop === "number" ? (
-            <img
-              src={getCardImage(publicState.discardTop)}
-              alt="discard"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                borderRadius: 14,
-                boxShadow: "0 6px 15px rgba(0,0,0,0.3)"
-              }}
-            />
+            <img src={getCardImage(publicState.discardTop)} alt="discard" style={{
+              position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+              objectFit: "contain", borderRadius: 14, boxShadow: "0 6px 15px rgba(0,0,0,0.3)"
+            }} />
           ) : (
-            <img
-              src={getBackImage()}
-              alt="empty"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                borderRadius: 14
-              }}
-            />
+            <img src={getBackImage()} alt="empty" style={{
+              position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+              objectFit: "contain", borderRadius: 14
+            }} />
           )}
         </div>
 
-        {/* Right controls: CABO, Doppelt ablegen, Zur Lobby */}
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 20,
-          alignItems: "center"
-        }}>
-
-          <button
-            disabled={
-              publicState?.players?.[publicState.turnIndex] !== socket.id ||
-              myHasDrawn ||
-              gameOver
-            }
+        {/* right controls */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20, alignItems: "center" }}>
+          <button disabled={publicState?.players?.[publicState.turnIndex] !== socket.id || myHasDrawn || gameOver}
             onClick={() => socket.emit("callCabo", roomId)}
-            style={{
-              width: 130,
-              height: 130,
-              borderRadius: "50%",
-              background: "#6f42c1",
-              color: "white",
-              fontSize: 18,
-              border: "none"
-            }}
-          >
+            style={{ width: 130, height: 130, borderRadius: "50%", background: "#6f42c1", color: "white", fontSize: 18, border: "none" }}>
             CABO
           </button>
 
-          <button
-            onClick={startClaimMode}
-            disabled={gameOver}
-            style={{
-              padding: "10px 20px",
-              borderRadius: 20,
-              background: "#6f42c1",
-              color: "white",
-              border: "none"
-            }}
-          >
+          <button onClick={startClaimMode} disabled={gameOver} style={{ padding: "10px 20px", borderRadius: 20, background: "#6f42c1", color: "white", border: "none" }}>
             Doppelt ablegen
           </button>
 
-          <button onClick={leave}>
-            Zur Lobby
-          </button>
+          <button onClick={leave}>Zur Lobby</button>
         </div>
       </div>
 
-      {/* EIGENE KARTEN (unten) */}
+      {/* OWN HAND (bottom) */}
       <div style={{ marginTop: 20 }}>
         <h3>Dein Blatt</h3>
 
         <div style={{ display: "flex", gap: 30, justifyContent: "center" }}>
           {myHand.map((c, i) => {
-
             const revealed = revealedIds.has(c.id) || c.revealed;
-            const temp = getTempReveal(socket.id, i);
+            const temp = getTempReveal(socket.id, i); // own internal index is UI index (assumption)
             const isTemp = !!temp;
-
             const isClaimSelected = claimSelection.includes(i);
             const isSelectable = special === "peekOwn" || (special === "swapOpponent" && selectedOwn === null);
 
             return (
-              <div
-                key={c.id}
+              <div key={c.id}
                 onClick={() => {
                   if (gameOver) return;
 
@@ -483,103 +353,41 @@ export default function Game({ socket, roomId, leave }) {
                   else if (drawnCard) swapWith(i);
                 }}
                 style={{
-                  width: 110,
-                  height: 170,
-                  borderRadius: 18,
+                  width: 110, height: 170, borderRadius: 18,
                   background: isClaimSelected ? "#ffe082" : "#ddd",
                   border: isTemp ? "4px solid gold" : (isSelectable ? "3px solid gold" : "none"),
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 28,
-                  cursor: gameOver ? "default" : "pointer",
-                  overflow: "hidden"
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28,
+                  cursor: gameOver ? "default" : "pointer", overflow: "hidden"
                 }}
               >
-                <img
-                  src={revealed ? getCardImage(c.value) : getBackImage()}
-                  alt="card"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "contain",
-                    borderRadius: 18
-                  }}
-                />
+                <img src={revealed ? getCardImage(c.value) : getBackImage()} alt="card" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 18 }} />
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* gezogene Karte sichtbar anzeigen */}
+      {/* drawn card visible */}
       <div style={{ marginTop: 15, textAlign: "center", fontSize: 18 }}>
         Gezogene Karte: {drawnCard ? (drawnCard.value ?? drawnCard) : "—"}
       </div>
 
-      {/* RESULT (modal) */}
+      {/* RESULT modal */}
       {gameOver && roundResult && (
         <div style={{
-          position: "absolute",
-          top: "30%",
-          left: "50%",
-          transform: "translate(-50%,-50%)",
-          background: "white",
-          padding: 30,
-          borderRadius: 20,
-          boxShadow: "0 10px 40px rgba(0,0,0,0.3)"
+          position: "absolute", top: "30%", left: "50%", transform: "translate(-50%,-50%)",
+          background: "white", padding: 30, borderRadius: 20, boxShadow: "0 10px 40px rgba(0,0,0,0.3)"
         }}>
           <h3>Runde beendet</h3>
-
           {Object.entries(roundResult.results).map(([p, pts]) => (
-            <div key={p}>
-              {publicState?.names?.[p]}: {pts} Punkte
-            </div>
+            <div key={p}>{publicState?.names?.[p]}: {pts} Punkte</div>
           ))}
-
-          <div style={{ marginTop: 10 }}>
-            <strong>
-              Gewinner: {publicState?.names?.[roundResult.winner]}
-            </strong>
-          </div>
-
+          <div style={{ marginTop: 10 }}><strong>Gewinner: {publicState?.names?.[roundResult.winner]}</strong></div>
           <div style={{ marginTop: 15 }}>
-            <button onClick={() => {
-              setRoundResult(null);
-              setGameOver(false);
-              leave();
-            }}>
-              Zur Lobby
-            </button>
+            <button onClick={() => { setRoundResult(null); setGameOver(false); leave(); }}>Zur Lobby</button>
           </div>
         </div>
       )}
-
-      {/* CABO Banner (NEU) */}
-      {caboBanner && (
-        <div style={{
-          position: "fixed",
-          top: 20,
-          left: "50%",
-          transform: "translateX(-50%)",
-          background: "rgba(0,0,0,0.85)",
-          color: "white",
-          padding: "12px 20px",
-          borderRadius: 12,
-          zIndex: 9999,
-          boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
-          display: "flex",
-          alignItems: "center",
-          gap: 12
-        }}>
-          <strong style={{ fontSize: 18 }}>CABO</strong>
-          <span style={{ opacity: 0.9 }}>
-            {publicState?.names?.[caboBanner.by] ? `von ${publicState.names[caboBanner.by]}` : ""}
-          </span>
-        </div>
-      )}
-
     </div>
   );
 }
-
