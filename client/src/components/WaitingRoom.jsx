@@ -11,18 +11,14 @@ export default function WaitingRoom({
   const [namesMap, setNamesMap] = useState({});
 
   useEffect(() => {
-    // Wenn jemand joint oder leaved
     const handleRoomUpdate = (data) => {
       if (!data) return;
-
       setNamesMap(data.names || {});
       setPlayers(Object.values(data.names || {}));
     };
 
     socket.on("roomUpdate", handleRoomUpdate);
 
-    // 🔥 WICHTIG:
-    // Direkt beim Betreten aktuellen Raumzustand holen
     socket.emit("roomInfo", roomId, (res) => {
       if (res?.ok) {
         setNamesMap(res.names || {});
@@ -48,44 +44,90 @@ export default function WaitingRoom({
   };
 
   return (
-    <div className="card-box">
-      <h2>Wartebereich — Raum {roomId}</h2>
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        backgroundImage: "url('/Background_tablet.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        className="card-box"
+        style={{
+          background: "#2CACAC",
+          color: "white",
+          padding: 30,
+          borderRadius: 16,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+          maxWidth: 500,
+          width: "90%",
+        }}
+      >
+        <h2 style={{ marginBottom: 16 }}>
+          Wartebereich — Raum {roomId}
+        </h2>
 
-      <div style={{ marginTop: 10 }}>
-        <strong>Spieler im Raum:</strong>
-        <ul>
-          {players.length > 0 ? (
-            players.map((p, i) => <li key={i}>{p}</li>)
+        <div style={{ marginTop: 10 }}>
+          <strong>Spieler im Raum:</strong>
+          <ul style={{ marginTop: 8 }}>
+            {players.length > 0 ? (
+              players.map((p, i) => <li key={i}>{p}</li>)
+            ) : (
+              <li>Warte auf Spieler...</li>
+            )}
+          </ul>
+        </div>
+
+        <div style={{ marginTop: 20 }}>
+          {players.length < 2 ? (
+            <div style={{ color: "#dffafa" }}>
+              Warte auf zweiten Spieler...
+            </div>
           ) : (
-            <li>Warte auf Spieler...</li>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={startGame}
+                style={{
+                  flex: 1,
+                  background: "white",
+                  color: "#2CACAC",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: "none",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
+              >
+                Spiel starten
+              </button>
+
+              <button
+                onClick={onLeave}
+                style={{
+                  flex: 1,
+                  background: "white",
+                  color: "#2CACAC",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: "none",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
+              >
+                Zurück zur Lobby
+              </button>
+            </div>
           )}
-        </ul>
-      </div>
-
-      <div style={{ marginTop: 15 }}>
-        {players.length < 2 ? (
-          <div style={{ color: "#777" }}>
-            Warte auf zweiten Spieler...
-          </div>
-        ) : (
-          <div style={{ display: "flex", gap: 10 }}>
-            <button
-              onClick={startGame}
-              style={{
-                background: "#16a34a",
-                color: "white",
-                padding: "8px 12px",
-                borderRadius: 8,
-              }}
-            >
-              Spiel starten
-            </button>
-
-            <button onClick={onLeave}>
-              Zurück zur Lobby
-            </button>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
