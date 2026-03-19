@@ -263,56 +263,60 @@ export default function Game({ socket, roomId, leave }) {
         <h3>{publicState?.names?.[opponentId]}</h3>
 
         <div style={{ display: "flex", gap: 20, justifyContent: "center" }}>
-          {Array.from({
-            length: opponentCount
-          }).map((_, uiIndex) => {
-            const realIndex = uiToServerOpponentIndex(uiIndex);
+         {Array.from({
+  length: publicState?.playerCardsCount?.[opponentId] ?? 4
+}).map((_, i) => {
 
-            const isSelectable =
-              special === "peekOpponent" ||
-              (special === "swapOpponent" && selectedOwn !== null);
+  const realIndex =
+    publicState.playerCardsCount[opponentId] - 1 - i;
 
-            const temp = getTempReveal(opponentId, realIndex);
+  const isSelectable =
+    special === "peekOpponent" ||
+    (special === "swapOpponent" && selectedOwn !== null);
 
-            return (
-              <div
-                key={uiIndex}
-                onClick={() => {
-                  if (!isSelectable || gameOver) return;
+  const temp = getTempReveal(opponentId, realIndex);
 
-                  if (special === "peekOpponent") {
-                    handleOpponentPeek(realIndex);
-                  }
+  const showFace = temp?.type === "peek";
 
-                  if (special === "swapOpponent") {
-                    handleSwapSelectOpponent(realIndex);
-                  }
-                }}
-                style={{
-                  width: 70,
-                  height: 110,
-                  borderRadius: 12,
-                  border: temp ? "4px solid gold" : (isSelectable ? "3px solid gold" : "none"),
-                  cursor: isSelectable ? "pointer" : "default",
-                  overflow: "hidden",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "#bbb"
-                }}
-              >
-                <img
-                  src={getBackImage()}
-                  alt="card"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "contain"
-                  }}
-                />
-              </div>
-            );
-          })}
+  return (
+    <div
+      key={i}
+      onClick={() => {
+        if (!isSelectable || gameOver) return;
+
+        if (special === "peekOpponent") {
+          handleOpponentPeek(realIndex);
+        }
+
+        if (special === "swapOpponent") {
+          handleSwapSelectOpponent(realIndex);
+        }
+      }}
+      style={{
+        width: 70,
+        height: 110,
+        borderRadius: 12,
+        border: temp ? "4px solid gold" : (isSelectable ? "3px solid gold" : "none"),
+        cursor: isSelectable ? "pointer" : "default",
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#bbb"
+      }}
+    >
+      <img
+        src={showFace ? getCardImage(temp.value) : getBackImage()}
+        alt="card"
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain"
+        }}
+      />
+    </div>
+  );
+})} 
         </div>
       </div>
 
