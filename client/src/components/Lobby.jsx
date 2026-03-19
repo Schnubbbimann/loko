@@ -24,17 +24,18 @@ export default function Lobby({ socket, setRoomId, name, setName }) {
 
   return (
     <div
-      style={{
-        minHeight: "100vh",
-        backgroundImage: "url('/Background_tablet.png')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
+  style={{
+    width: "100vw",
+    height: "100vh",
+    backgroundImage: "url('/Background_Tablet.png')",
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+  }}
+>
       <div
         className="card-box lobby"
         style={{
