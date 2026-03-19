@@ -28,11 +28,8 @@ export default function Game({ socket, roomId, leave }) {
   const [roundResult, setRoundResult] = useState(null);
   const [gameOver, setGameOver] = useState(false);
 
-  // temp reveals from server (unchanged)
   const [tempReveals, setTempReveals] = useState([]);
-
-  // NEW: CABO banner state
-  const [caboBanner, setCaboBanner] = useState(null); // { by: playerId }
+  const [caboBanner, setCaboBanner] = useState(null);
 
   useEffect(() => {
     socket.on("stateUpdate", setPublicState);
@@ -83,8 +80,6 @@ export default function Game({ socket, roomId, leave }) {
     };
   }, [socket, roomId]);
 
-  /* ================= SPECIAL ACTION HELPERS (client sends payloads) ================ */
-
   const handleOwnPeek = (index) => {
     socket.emit("specialResolve", {
       roomId,
@@ -113,8 +108,6 @@ export default function Game({ socket, roomId, leave }) {
     setSelectedOwn(null);
     setSpecial(null);
   };
-
-  /* ================= START / PEEK / DRAW / SWAP ================= */
 
   const peekTwo = () => {
     if (initialPeekDone) return;
@@ -162,8 +155,6 @@ export default function Game({ socket, roomId, leave }) {
     });
   };
 
-  /* ================= CLAIM (doppelt ablegen) ================ */
-
   const startClaimMode = () => {
     if (gameOver) return;
     setClaimMode(true);
@@ -193,8 +184,6 @@ export default function Game({ socket, roomId, leave }) {
     }
   };
 
-  /* ================= RENDER HELPERS ================= */
-
   if (!publicState) {
     return <div style={{ padding: 40 }}>Lade Spiel...</div>;
   }
@@ -205,11 +194,11 @@ export default function Game({ socket, roomId, leave }) {
   const myHasDrawn = publicState.playerHasDrawn?.[socket.id] ?? false;
 
   const getTempReveal = (playerId, index) => {
-    return tempReveals.find(r => r.playerId === playerId && Number(r.index) === Number(index));
+    return tempReveals.find(
+      r => r.playerId === playerId && Number(r.index) === Number(index)
+    );
   };
 
-  // Gegner werden gespiegelt angezeigt:
-  // UI links -> interner Index rechts
   const opponentCount = publicState?.playerCardsCount?.[opponentId] ?? 4;
   const uiToServerOpponentIndex = (uiIndex) => opponentCount - 1 - uiIndex;
 
@@ -223,7 +212,6 @@ export default function Game({ socket, roomId, leave }) {
       background: "#f3f3f3"
     }}>
 
-      {/* TOP */}
       <div style={{ textAlign: "center" }}>
         <h3>Am Zug: {currentName}</h3>
 
@@ -248,17 +236,14 @@ export default function Game({ socket, roomId, leave }) {
         </div>
       </div>
 
-      {/* OPPONENT (top) */}
       <div style={{ marginTop: 20 }}>
         <h3>{publicState?.names?.[opponentId]}</h3>
 
         <div style={{ display: "flex", gap: 20, justifyContent: "center" }}>
           {Array.from({
-            length: publicState?.playerCardsCount?.[opponentId] ?? 4
+            length: opponentCount
           }).map((_, i) => {
-
-            const realIndex =
-              publicState.playerCardsCount[opponentId] - 1 - i;
+            const realIndex = uiToServerOpponentIndex(i);
 
             const isSelectable =
               special === "peekOpponent" ||
@@ -288,7 +273,9 @@ export default function Game({ socket, roomId, leave }) {
                   width: 70,
                   height: 110,
                   borderRadius: 12,
-                  border: temp ? "4px solid gold" : (isSelectable ? "3px solid gold" : "none"),
+                  border: temp
+                    ? "4px solid gold"
+                    : (isSelectable ? "3px solid gold" : "none"),
                   cursor: isSelectable ? "pointer" : "default",
                   overflow: "hidden",
                   display: "flex",
@@ -312,14 +299,12 @@ export default function Game({ socket, roomId, leave }) {
         </div>
       </div>
 
-      {/* MITTE: Deck / Discard / Buttons */}
       <div style={{
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
         gap: 120
       }}>
-        {/* Nachziehstapel (visual stack) */}
         <div
           onClick={() => takeFrom("deck")}
           style={{
@@ -348,7 +333,6 @@ export default function Game({ socket, roomId, leave }) {
           ))}
         </div>
 
-        {/* Ablagestapel (stack visual + top card shown) */}
         <div
           onClick={() => takeFrom("discard")}
           style={{
@@ -408,7 +392,6 @@ export default function Game({ socket, roomId, leave }) {
           )}
         </div>
 
-        {/* Right controls: CABO, Doppelt ablegen, Zur Lobby */}
         <div style={{
           display: "flex",
           flexDirection: "column",
@@ -456,7 +439,6 @@ export default function Game({ socket, roomId, leave }) {
         </div>
       </div>
 
-      {/* EIGENE KARTEN (unten) */}
       <div style={{ marginTop: 20 }}>
         <h3>Dein Blatt</h3>
 
@@ -495,7 +477,9 @@ export default function Game({ socket, roomId, leave }) {
                   height: 170,
                   borderRadius: 18,
                   background: claimSelection.includes(i) ? "#ffe082" : "#ddd",
-                  border: temp ? "4px solid gold" : (isSelectable ? "3px solid gold" : "none"),
+                  border: temp
+                    ? "4px solid gold"
+                    : (isSelectable ? "3px solid gold" : "none"),
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -518,12 +502,10 @@ export default function Game({ socket, roomId, leave }) {
         </div>
       </div>
 
-      {/* gezogene Karte sichtbar anzeigen */}
       <div style={{ marginTop: 15, textAlign: "center", fontSize: 18 }}>
         Gezogene Karte: {drawnCard ? (drawnCard.value ?? drawnCard) : "—"}
       </div>
 
-      {/* RESULT (modal) */}
       {gameOver && roundResult && (
         <div style={{
           position: "absolute",
@@ -561,7 +543,6 @@ export default function Game({ socket, roomId, leave }) {
         </div>
       )}
 
-      {/* CABO Banner (NEU) */}
       {caboBanner && (
         <div style={{
           position: "fixed",
