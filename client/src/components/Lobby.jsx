@@ -25,7 +25,7 @@ export default function Lobby({ socket, setRoomId, name, setName }) {
 
   return (
     <div className="card-box lobby">
-      <h2>Lobby</h2>
+      <h2>Neues Spiel</h2>
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <input placeholder="Dein Name" value={name} onChange={(e) => setName(e.target.value)} />
         <input placeholder="Raum-ID" value={roomInput} onChange={(e) => setRoomInput(e.target.value)} />
