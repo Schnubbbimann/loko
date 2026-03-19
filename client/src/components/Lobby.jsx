@@ -27,7 +27,7 @@ export default function Lobby({ socket, setRoomId, name, setName }) {
   style={{
     width: "100vw",
     height: "100vh",
-    backgroundImage: "url('/Background_Tablet.png')",
+    backgroundImage: "url('/Background_tablet.png')",
     backgroundSize: "cover",
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",
