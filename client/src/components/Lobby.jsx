@@ -1,7 +1,20 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 export default function Lobby({ socket, setRoomId, name, setName }) {
   const [roomInput, setRoomInput] = useState("");
+
+  useEffect(() => {
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, []);
 
   const createRoom = () => {
     if (!roomInput || !name) return alert("Bitte Name & Raum-ID eingeben");
@@ -24,18 +37,22 @@ export default function Lobby({ socket, setRoomId, name, setName }) {
 
   return (
     <div
-  style={{
-    width: "100vw",
-    height: "100vh",
-    backgroundImage: "url('/Background_tablet.png')",
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  }}
->
+      style={{
+        position: "fixed",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        backgroundImage: "url('/Background_tablet.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        overflow: "hidden",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        boxSizing: "border-box",
+      }}
+    >
       <div
         className="card-box lobby"
         style={{
@@ -44,42 +61,63 @@ export default function Lobby({ socket, setRoomId, name, setName }) {
           padding: 30,
           borderRadius: 16,
           boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
-          maxWidth: 500,
-          width: "100%",
+          maxWidth: 560,
+          width: "min(560px, calc(100vw - 32px))",
+          boxSizing: "border-box",
         }}
       >
-        <h2 style={{ marginBottom: 16 }}>Neues Spiel</h2>
+        <h2 style={{ marginBottom: 16, marginTop: 0 }}>Neues Spiel</h2>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            marginBottom: 12,
+            flexWrap: "wrap",
+          }}
+        >
           <input
             placeholder="Dein Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             style={{
-              flex: 1,
+              flex: "1 1 220px",
+              minWidth: 0,
               padding: 10,
               borderRadius: 8,
               border: "none",
+              fontSize: 16,
+              boxSizing: "border-box",
+              outline: "none",
+              WebkitAppearance: "none",
+              appearance: "none",
             }}
           />
+
           <input
             placeholder="Raum-ID"
             value={roomInput}
             onChange={(e) => setRoomInput(e.target.value)}
             style={{
-              flex: 1,
+              flex: "1 1 220px",
+              minWidth: 0,
               padding: 10,
               borderRadius: 8,
               border: "none",
+              fontSize: 16,
+              boxSizing: "border-box",
+              outline: "none",
+              WebkitAppearance: "none",
+              appearance: "none",
             }}
           />
         </div>
 
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             onClick={createRoom}
             style={{
-              flex: 1,
+              flex: "1 1 220px",
               padding: "10px 16px",
               borderRadius: 8,
               border: "none",
@@ -87,6 +125,8 @@ export default function Lobby({ socket, setRoomId, name, setName }) {
               color: "#FC6B85",
               fontWeight: "bold",
               cursor: "pointer",
+              fontSize: 16,
+              touchAction: "manipulation",
             }}
           >
             Raum erstellen
@@ -95,7 +135,7 @@ export default function Lobby({ socket, setRoomId, name, setName }) {
           <button
             onClick={joinRoom}
             style={{
-              flex: 1,
+              flex: "1 1 220px",
               padding: "10px 16px",
               borderRadius: 8,
               border: "none",
@@ -103,15 +143,16 @@ export default function Lobby({ socket, setRoomId, name, setName }) {
               color: "#FC6B85",
               fontWeight: "bold",
               cursor: "pointer",
+              fontSize: 16,
+              touchAction: "manipulation",
             }}
           >
             Beitreten
           </button>
         </div>
 
-        <p style={{ marginTop: 12, color: "#ffe3ea", fontSize: 14 }}>
-          Tipp: Teile die Raum-ID mit deinem Freund; beide müssen im selben Raum
-          sein bevor das Spiel gestartet wird.
+        <p style={{ marginTop: 12, color: "#ffe3ea", fontSize: 14, marginBottom: 0 }}>
+          Tipp: Teile die Raum-ID mit deinem Freund; beide müssen im selben Raum sein bevor das Spiel gestartet wird.
         </p>
       </div>
     </div>
