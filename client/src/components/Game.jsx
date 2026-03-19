@@ -60,6 +60,9 @@ export default function Game({ socket, roomId, leave }) {
   const [tempReveals, setTempReveals] = useState([]);
   const [caboBanner, setCaboBanner] = useState(null);
 
+  const [drawSource, setDrawSource] = useState(null);
+  const [drawAnim, setDrawAnim] = useState(false);
+
   const [discardAnimCard, setDiscardAnimCard] = useState(null);
   const [discardAnim, setDiscardAnim] = useState(false);
 
@@ -69,6 +72,8 @@ export default function Game({ socket, roomId, leave }) {
 
     socket.on("specialAction", (data) => {
       setDrawnCard(null);
+      setDrawSource(null);
+      setDrawAnim(false);
       setSpecial(data.type);
     });
 
@@ -171,9 +176,17 @@ export default function Game({ socket, roomId, leave }) {
   };
 
   const takeFrom = (from) => {
-    if (gameOver) return;
+    if (gameOver || !isMyTurn) return;
+
     socket.emit("take", { roomId, from }, (res) => {
-      if (res?.ok) setDrawnCard(res.card);
+      if (res?.ok) {
+        setDrawSource(from);
+        setDrawnCard(res.card);
+        setDrawAnim(false);
+        setTimeout(() => {
+          setDrawAnim(true);
+        }, 20);
+      }
     });
   };
 
@@ -182,6 +195,8 @@ export default function Game({ socket, roomId, leave }) {
     if (!drawnCard) return;
     socket.emit("swap", { roomId, index, drawnCard }, () => {
       setDrawnCard(null);
+      setDrawSource(null);
+      setDrawAnim(false);
     });
   };
 
@@ -200,6 +215,10 @@ export default function Game({ socket, roomId, leave }) {
     setTimeout(() => {
       socket.emit("swap", { roomId, index: -1, drawnCard }, () => {
         setDrawnCard(null);
+        setDrawSource(null);
+        setDrawAnim(false);
+        setDiscardAnimCard(null);
+        setDiscardAnim(false);
       });
     }, 280);
 
@@ -488,68 +507,109 @@ export default function Game({ socket, roomId, leave }) {
       <div style={{ marginTop: 20 }}>
         <h3>Dein Blatt</h3>
 
-        <div style={{ display: "flex", gap: 30, justifyContent: "center" }}>
-          {myHand.map((c, i) => {
-            const temp = getTempReveal(socket.id, i);
-
-            const isSelectable =
-              special === "peekOwn" ||
-              (special === "swapOpponent" && selectedOwn === null);
-
-            const showFace =
-              revealedIds.has(c.id) ||
-              c.revealed ||
-              (temp?.type === "peek" && temp?.by === socket.id);
-
-            return (
-              <div
-                key={c.id}
-                onClick={() => {
-                  if (gameOver) return;
-
-                  if (initialPeekMode)
-                    handleInitialPeekClick(c.id);
-                  else if (claimMode)
-                    toggleClaim(i);
-                  else if (special === "peekOwn")
-                    handleOwnPeek(i);
-                  else if (special === "swapOpponent" && selectedOwn === null)
-                    handleSwapSelectOwn(i);
-                  else if (drawnCard)
-                    swapWith(i);
-                }}
-                style={{
-                  width: 110,
-                  height: 170,
-                  borderRadius: 18,
-                  background: claimSelection.includes(i) ? "#ffe082" : "#ddd",
-                  border: temp
-                    ? "4px solid gold"
-                    : (isSelectable ? "3px solid gold" : "none"),
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: gameOver ? "default" : "pointer",
-                  overflow: "hidden"
-                }}
-              >
-                <div style={flipStageStyle}>
-                  <div style={flipInnerStyle(showFace)}>
-                    <img
-                      src={getBackImage()}
-                      alt="card back"
-                      style={flipFaceStyle}
-                    />
-                    <img
-                      src={getCardImage(c.value)}
-                      alt="card front"
-                      style={flipFrontFaceStyle}
-                    />
-                  </div>
+        <div style={{
+          display: "flex",
+          gap: 30,
+          justifyContent: "center",
+          alignItems: "flex-end"
+        }}>
+          {drawnCard && (
+            <div
+              style={{
+                width: 110,
+                height: 170,
+                borderRadius: 18,
+                overflow: "hidden",
+                boxShadow: "0 10px 20px rgba(0,0,0,0.2)",
+                transform: drawAnim
+                  ? "translateX(0) translateY(0) scale(1)"
+                  : drawSource === "discard"
+                    ? "translateX(60px) translateY(-10px) scale(0.85)"
+                    : "translateX(-90px) translateY(-10px) scale(0.85)",
+                opacity: drawAnim ? 1 : 0,
+                transition: "transform 0.35s ease, opacity 0.35s ease"
+              }}
+            >
+              <div style={flipStageStyle}>
+                <div style={flipInnerStyle(true)}>
+                  <img
+                    src={getBackImage()}
+                    alt="draw back"
+                    style={flipFaceStyle}
+                  />
+                  <img
+                    src={getCardImage(drawnCard.value ?? drawnCard)}
+                    alt="draw front"
+                    style={flipFrontFaceStyle}
+                  />
                 </div>
               </div>
-            );
-          })}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 30, justifyContent: "center" }}>
+            {myHand.map((c, i) => {
+              const temp = getTempReveal(socket.id, i);
+
+              const isSelectable =
+                special === "peekOwn" ||
+                (special === "swapOpponent" && selectedOwn === null);
+
+              const showFace =
+                revealedIds.has(c.id) ||
+                c.revealed ||
+                (temp?.type === "peek" && temp?.by === socket.id);
+
+              return (
+                <div
+                  key={c.id}
+                  onClick={() => {
+                    if (gameOver) return;
+
+                    if (initialPeekMode)
+                      handleInitialPeekClick(c.id);
+                    else if (claimMode)
+                      toggleClaim(i);
+                    else if (special === "peekOwn")
+                      handleOwnPeek(i);
+                    else if (special === "swapOpponent" && selectedOwn === null)
+                      handleSwapSelectOwn(i);
+                    else if (drawnCard)
+                      swapWith(i);
+                  }}
+                  style={{
+                    width: 110,
+                    height: 170,
+                    borderRadius: 18,
+                    background: claimSelection.includes(i) ? "#ffe082" : "#ddd",
+                    border: temp
+                      ? "4px solid gold"
+                      : (isSelectable ? "3px solid gold" : "none"),
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: gameOver ? "default" : "pointer",
+                    overflow: "hidden"
+                  }}
+                >
+                  <div style={flipStageStyle}>
+                    <div style={flipInnerStyle(showFace)}>
+                      <img
+                        src={getBackImage()}
+                        alt="card back"
+                        style={flipFaceStyle}
+                      />
+                      <img
+                        src={getCardImage(c.value)}
+                        alt="card front"
+                        style={flipFrontFaceStyle}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {!initialPeekDone && !gameOver && (
@@ -559,10 +619,6 @@ export default function Game({ socket, roomId, leave }) {
             </button>
           </div>
         )}
-      </div>
-
-      <div style={{ marginTop: 15, textAlign: "center", fontSize: 18 }}>
-        Gezogene Karte: {drawnCard ? (drawnCard.value ?? drawnCard) : "—"}
       </div>
 
       {drawnCard && !gameOver && (
