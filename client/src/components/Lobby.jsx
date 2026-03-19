@@ -5,7 +5,6 @@ export default function Lobby({ socket, setRoomId, name, setName }) {
 
   const createRoom = () => {
     if (!roomInput || !name) return alert("Bitte Name & Raum-ID eingeben");
-    // createRoom now expects payload {roomId, name}
     socket.emit("createRoom", { roomId: roomInput, name }, (res) => {
       if (res?.ok) {
         setRoomId(roomInput);
@@ -24,21 +23,96 @@ export default function Lobby({ socket, setRoomId, name, setName }) {
   };
 
   return (
-    <div className="card-box lobby">
-      <h2>Neues Spiel</h2>
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <input placeholder="Dein Name" value={name} onChange={(e) => setName(e.target.value)} />
-        <input placeholder="Raum-ID" value={roomInput} onChange={(e) => setRoomInput(e.target.value)} />
-      </div>
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundImage: "url('/Background_tablet.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <div
+        className="card-box lobby"
+        style={{
+          background: "#FC6B85",
+          color: "white",
+          padding: 30,
+          borderRadius: 16,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+          maxWidth: 500,
+          width: "100%",
+        }}
+      >
+        <h2 style={{ marginBottom: 16 }}>Neues Spiel</h2>
 
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={createRoom}>Raum erstellen</button>
-        <button onClick={joinRoom}>Beitreten</button>
-      </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <input
+            placeholder="Dein Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            style={{
+              flex: 1,
+              padding: 10,
+              borderRadius: 8,
+              border: "none",
+            }}
+          />
+          <input
+            placeholder="Raum-ID"
+            value={roomInput}
+            onChange={(e) => setRoomInput(e.target.value)}
+            style={{
+              flex: 1,
+              padding: 10,
+              borderRadius: 8,
+              border: "none",
+            }}
+          />
+        </div>
 
-      <p style={{ marginTop: 12, color: "#555" }}>
-        Tipp: Teile die Raum-ID mit deinem Freund; beide müssen im selben Raum sein bevor das Spiel gestartet wird.
-      </p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={createRoom}
+            style={{
+              flex: 1,
+              padding: "10px 16px",
+              borderRadius: 8,
+              border: "none",
+              background: "white",
+              color: "#FC6B85",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            Raum erstellen
+          </button>
+
+          <button
+            onClick={joinRoom}
+            style={{
+              flex: 1,
+              padding: "10px 16px",
+              borderRadius: 8,
+              border: "none",
+              background: "white",
+              color: "#FC6B85",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            Beitreten
+          </button>
+        </div>
+
+        <p style={{ marginTop: 12, color: "#ffe3ea", fontSize: 14 }}>
+          Tipp: Teile die Raum-ID mit deinem Freund; beide müssen im selben Raum
+          sein bevor das Spiel gestartet wird.
+        </p>
+      </div>
     </div>
   );
 }
