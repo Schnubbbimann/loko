@@ -53,10 +53,16 @@ export default function Game({ socket, roomId, leave }) {
     });
 
     socket.on("tempReveal", (payload) => {
-      if (!payload || !Array.isArray(payload.cards)) return;
-      setTempReveals(payload.cards);
-      setTimeout(() => setTempReveals([]), 2000);
-    });
+  if (!payload || !Array.isArray(payload.cards)) return;
+
+  const cardsWithOwner = payload.cards.map((c) => ({
+    ...c,
+    by: payload.by
+  }));
+
+  setTempReveals(cardsWithOwner);
+  setTimeout(() => setTempReveals([]), 2000);
+});
 
     socket.on("caboCalled", (data) => {
       setCaboBanner(data || { by: null });
