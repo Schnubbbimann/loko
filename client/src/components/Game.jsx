@@ -43,15 +43,7 @@ export default function Game({ socket, roomId, leave }) {
       setSpecial(data.type);
     });
 
-    socket.on("revealOwn", (d) => {
-      if (d?.value !== undefined) alert("Deine Karte: " + d.value);
-    });
-
-    socket.on("revealOpponent", (d) => {
-      if (d?.value !== undefined) {
-        alert("Gegnerkarte: " + d.value);
-      }
-    });
+    
 
     socket.on("claimResult", (d) => {
       if (d.correct) alert("Richtig! Zwei gleiche Karten entfernt.");
