@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import backgroundImage from "./Background_Tablet.png";
 
 export default function Lobby({ socket, setRoomId, name, setName }) {
   const [roomInput, setRoomInput] = useState("");
@@ -7,8 +6,11 @@ export default function Lobby({ socket, setRoomId, name, setName }) {
   const createRoom = () => {
     if (!roomInput || !name) return alert("Bitte Name & Raum-ID eingeben");
     socket.emit("createRoom", { roomId: roomInput, name }, (res) => {
-      if (res?.ok) setRoomId(roomInput);
-      else alert(res?.error || "Fehler beim Erstellen");
+      if (res?.ok) {
+        setRoomId(roomInput);
+      } else {
+        alert(res?.error || "Fehler beim Erstellen");
+      }
     });
   };
 
@@ -24,7 +26,7 @@ export default function Lobby({ socket, setRoomId, name, setName }) {
     <div
       style={{
         minHeight: "100vh",
-        backgroundImage: `url(${backgroundImage})`,
+        backgroundImage: "url('/Background_tablet.png')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
