@@ -9,6 +9,35 @@ const getBackImage = () => {
   return new URL(`../assets/cards/back.jpeg`, import.meta.url).href;
 };
 
+const flipStageStyle = {
+  width: "100%",
+  height: "100%",
+  perspective: "1000px"
+};
+
+const flipInnerStyle = (flipped) => ({
+  width: "100%",
+  height: "100%",
+  position: "relative",
+  transformStyle: "preserve-3d",
+  transition: "transform 0.45s ease",
+  transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)"
+});
+
+const flipFaceStyle = {
+  position: "absolute",
+  inset: 0,
+  backfaceVisibility: "hidden",
+  WebkitBackfaceVisibility: "hidden",
+  width: "100%",
+  height: "100%"
+};
+
+const flipFrontFaceStyle = {
+  ...flipFaceStyle,
+  transform: "rotateY(180deg)"
+};
+
 export default function Game({ socket, roomId, leave }) {
   const [publicState, setPublicState] = useState(null);
   const [myHand, setMyHand] = useState([]);
@@ -30,6 +59,9 @@ export default function Game({ socket, roomId, leave }) {
 
   const [tempReveals, setTempReveals] = useState([]);
   const [caboBanner, setCaboBanner] = useState(null);
+
+  const [discardAnimCard, setDiscardAnimCard] = useState(null);
+  const [discardAnim, setDiscardAnim] = useState(false);
 
   useEffect(() => {
     socket.on("stateUpdate", setPublicState);
@@ -156,9 +188,25 @@ export default function Game({ socket, roomId, leave }) {
   const discardDrawn = () => {
     if (gameOver) return;
     if (!drawnCard) return;
-    socket.emit("swap", { roomId, index: -1, drawnCard }, () => {
-      setDrawnCard(null);
-    });
+    if (discardAnimCard) return;
+
+    setDiscardAnimCard(drawnCard);
+    setDiscardAnim(false);
+
+    setTimeout(() => {
+      setDiscardAnim(true);
+    }, 20);
+
+    setTimeout(() => {
+      socket.emit("swap", { roomId, index: -1, drawnCard }, () => {
+        setDrawnCard(null);
+      });
+    }, 280);
+
+    setTimeout(() => {
+      setDiscardAnimCard(null);
+      setDiscardAnim(false);
+    }, 700);
   };
 
   const startClaimMode = () => {
@@ -271,15 +319,20 @@ export default function Game({ socket, roomId, leave }) {
                   background: "#bbb"
                 }}
               >
-                <img
-                  src={showFace ? getCardImage(temp.value) : getBackImage()}
-                  alt="card"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "contain"
-                  }}
-                />
+                <div style={flipStageStyle}>
+                  <div style={flipInnerStyle(showFace)}>
+                    <img
+                      src={getBackImage()}
+                      alt="card back"
+                      style={flipFaceStyle}
+                    />
+                    <img
+                      src={showFace ? getCardImage(temp?.value) : getBackImage()}
+                      alt="card front"
+                      style={flipFrontFaceStyle}
+                    />
+                  </div>
+                </div>
               </div>
             );
           })}
@@ -480,15 +533,20 @@ export default function Game({ socket, roomId, leave }) {
                   overflow: "hidden"
                 }}
               >
-                <img
-                  src={showFace ? getCardImage(c.value) : getBackImage()}
-                  alt="card"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "contain"
-                  }}
-                />
+                <div style={flipStageStyle}>
+                  <div style={flipInnerStyle(showFace)}>
+                    <img
+                      src={getBackImage()}
+                      alt="card back"
+                      style={flipFaceStyle}
+                    />
+                    <img
+                      src={getCardImage(c.value)}
+                      alt="card front"
+                      style={flipFrontFaceStyle}
+                    />
+                  </div>
+                </div>
               </div>
             );
           })}
@@ -512,6 +570,40 @@ export default function Game({ socket, roomId, leave }) {
           <button onClick={discardDrawn}>
             Abwerfen
           </button>
+        </div>
+      )}
+
+      {discardAnimCard && (
+        <div
+          style={{
+            position: "fixed",
+            left: "50%",
+            top: "78%",
+            transform: discardAnim
+              ? "translate(-50%, -180px) scale(0.6) rotate(8deg)"
+              : "translate(-50%, 0px) scale(1) rotate(0deg)",
+            opacity: discardAnim ? 0 : 1,
+            transition: "transform 0.35s ease, opacity 0.35s ease",
+            zIndex: 9998,
+            pointerEvents: "none",
+            width: 110,
+            height: 170
+          }}
+        >
+          <div style={flipStageStyle}>
+            <div style={flipInnerStyle(true)}>
+              <img
+                src={getBackImage()}
+                alt="discard back"
+                style={flipFaceStyle}
+              />
+              <img
+                src={getCardImage(discardAnimCard.value)}
+                alt="discard front"
+                style={flipFrontFaceStyle}
+              />
+            </div>
+          </div>
         </div>
       )}
 
