@@ -1,1 +1,26 @@
+body {
+  margin: 0;
+}
 
+/* Standard = Tablet (quer) */
+.game-container {
+  min-height: 100vh;
+  background-image: url("../assets/backgrounds/tablet.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Tablet Hochkant */
+@media (max-width: 1024px) and (orientation: portrait) {
+  .game-container {
+    background-image: url("../assets/backgrounds/tablet-portrait.jpg");
+  }
+}
+
+/* iPhone 13 Hochkant */
+@media (max-width: 430px) and (orientation: portrait) {
+  .game-container {
+    background-image: url("../assets/backgrounds/iphone13-portrait.jpg");
+  }
+}
