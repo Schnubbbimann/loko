@@ -43,8 +43,6 @@ export default function Game({ socket, roomId, leave }) {
       setSpecial(data.type);
     });
 
-    
-
     socket.on("claimResult", (d) => {
       if (d.correct) alert("Richtig! Zwei gleiche Karten entfernt.");
       else alert("Falsch! Strafkarte erhalten.");
@@ -255,60 +253,62 @@ export default function Game({ socket, roomId, leave }) {
         <h3>{publicState?.names?.[opponentId]}</h3>
 
         <div style={{ display: "flex", gap: 20, justifyContent: "center" }}>
-         {Array.from({
-  length: publicState?.playerCardsCount?.[opponentId] ?? 4
-}).map((_, i) => {
+          {Array.from({
+            length: publicState?.playerCardsCount?.[opponentId] ?? 4
+          }).map((_, i) => {
 
-  const realIndex =
-    publicState.playerCardsCount[opponentId] - 1 - i;
+            const realIndex =
+              publicState.playerCardsCount[opponentId] - 1 - i;
 
-  const isSelectable =
-    special === "peekOpponent" ||
-    (special === "swapOpponent" && selectedOwn !== null);
+            const isSelectable =
+              special === "peekOpponent" ||
+              (special === "swapOpponent" && selectedOwn !== null);
 
-  const temp = getTempReveal(opponentId, realIndex);
+            const temp = getTempReveal(opponentId, realIndex);
 
-  const showFace = temp?.type === "peek";
+            const showFace =
+              temp?.type === "peek" &&
+              temp?.by === socket.id;
 
-  return (
-    <div
-      key={i}
-      onClick={() => {
-        if (!isSelectable || gameOver) return;
+            return (
+              <div
+                key={i}
+                onClick={() => {
+                  if (!isSelectable || gameOver) return;
 
-        if (special === "peekOpponent") {
-          handleOpponentPeek(realIndex);
-        }
+                  if (special === "peekOpponent") {
+                    handleOpponentPeek(realIndex);
+                  }
 
-        if (special === "swapOpponent") {
-          handleSwapSelectOpponent(realIndex);
-        }
-      }}
-      style={{
-        width: 70,
-        height: 110,
-        borderRadius: 12,
-        border: temp ? "4px solid gold" : (isSelectable ? "3px solid gold" : "none"),
-        cursor: isSelectable ? "pointer" : "default",
-        overflow: "hidden",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#bbb"
-      }}
-    >
-      <img
-        src={showFace ? getCardImage(temp.value) : getBackImage()}
-        alt="card"
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "contain"
-        }}
-      />
-    </div>
-  );
-})} 
+                  if (special === "swapOpponent") {
+                    handleSwapSelectOpponent(realIndex);
+                  }
+                }}
+                style={{
+                  width: 70,
+                  height: 110,
+                  borderRadius: 12,
+                  border: temp ? "4px solid gold" : (isSelectable ? "3px solid gold" : "none"),
+                  cursor: isSelectable ? "pointer" : "default",
+                  overflow: "hidden",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "#bbb"
+                }}
+              >
+                <img
+                  src={showFace ? getCardImage(temp.value) : getBackImage()}
+                  alt="card"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain"
+                  }}
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -462,54 +462,58 @@ export default function Game({ socket, roomId, leave }) {
 
         <div style={{ display: "flex", gap: 30, justifyContent: "center" }}>
           {myHand.map((c, i) => {
-const temp = getTempReveal(socket.id, i);
-const showFace =
-  revealedIds.has(c.id) ||
-  c.revealed ||
-  temp?.type === "peek";
+            const temp = getTempReveal(socket.id, i);
 
-return (
-  <div
-    key={c.id}
-    onClick={() => {
-      if (gameOver) return;
+            const isSelectable =
+              special === "peekOwn" ||
+              (special === "swapOpponent" && selectedOwn === null);
 
-      if (initialPeekMode)
-        handleInitialPeekClick(c.id);
-      else if (claimMode)
-        toggleClaim(i);
-      else if (special === "peekOwn")
-        handleOwnPeek(i);
-      else if (special === "swapOpponent" && selectedOwn === null)
-        handleSwapSelectOwn(i);
-      else if (drawnCard)
-        swapWith(i);
-    }}
-    style={{
-      width: 110,
-      height: 170,
-      borderRadius: 18,
-      background: claimSelection.includes(i) ? "#ffe082" : "#ddd",
-      border: temp ? "4px solid gold" : (special ? "3px solid gold" : "none"),
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      cursor: gameOver ? "default" : "pointer",
-      overflow: "hidden"
-    }}
-  >
-    <img
-      src={showFace ? getCardImage(c.value) : getBackImage()}
-      alt="card"
-      style={{
-        width: "100%",
-        height: "100%",
-        objectFit: "contain"
-      }}
-    />
-  </div>
-);
-            
+            const showFace =
+              revealedIds.has(c.id) ||
+              c.revealed ||
+              (temp?.type === "peek" && temp?.by === socket.id);
+
+            return (
+              <div
+                key={c.id}
+                onClick={() => {
+                  if (gameOver) return;
+
+                  if (initialPeekMode)
+                    handleInitialPeekClick(c.id);
+                  else if (claimMode)
+                    toggleClaim(i);
+                  else if (special === "peekOwn")
+                    handleOwnPeek(i);
+                  else if (special === "swapOpponent" && selectedOwn === null)
+                    handleSwapSelectOwn(i);
+                  else if (drawnCard)
+                    swapWith(i);
+                }}
+                style={{
+                  width: 110,
+                  height: 170,
+                  borderRadius: 18,
+                  background: claimSelection.includes(i) ? "#ffe082" : "#ddd",
+                  border: temp ? "4px solid gold" : (isSelectable ? "3px solid gold" : "none"),
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: gameOver ? "default" : "pointer",
+                  overflow: "hidden"
+                }}
+              >
+                <img
+                  src={showFace ? getCardImage(c.value) : getBackImage()}
+                  alt="card"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain"
+                  }}
+                />
+              </div>
+            );
           })}
         </div>
       </div>
@@ -580,7 +584,6 @@ return (
           </span>
         </div>
       )}
-
     </div>
   );
 }
