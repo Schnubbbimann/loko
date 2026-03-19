@@ -302,7 +302,15 @@ io.on("connection", (socket) => {
 
     // if we have revealCards, broadcast them as a single tempReveal event to the whole room
     if (revealCards.length > 0) {
-      io.to(roomId).emit("tempReveal", { cards: revealCards });
+     io.to(roomId).emit("tempReveal", {
+  by: socket.id,
+  cards: revealCards.map(c => ({
+    playerId: c.playerId,
+    index: Number(c.index),
+    value: c.value,
+    type: c.type
+  }))
+}); 
     }
 
     // special ends the turn
