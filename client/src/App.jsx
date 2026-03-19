@@ -26,9 +26,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <header>
-        <h1>Cabo — Geschenkversion</h1>
-      </header>
+      
 
       {!roomId ? (
         <Lobby
