@@ -1,4 +1,5 @@
 // src/components/Game.jsx
+import "./Game.css";
 import React, { useEffect, useState } from "react";
 
 const getCardImage = (value) => {
