@@ -397,9 +397,16 @@ export default function Game({ socket, roomId, leave }) {
 
         <div
           onClick={() => {
-            if (gameOver || !isMyTurn) return;
-            takeFrom("discard");
-          }}
+  if (gameOver || !isMyTurn) return;
+
+  // 🔥 NEU: wenn Karte gezogen → abwerfen
+  if (drawnCard) {
+    discardDrawn();
+  } else {
+    // sonst normal ziehen
+    takeFrom("discard");
+  }
+}}
           style={{
             width: 90,
             height: 140,
@@ -621,13 +628,7 @@ export default function Game({ socket, roomId, leave }) {
         )}
       </div>
 
-      {drawnCard && !gameOver && (
-        <div style={{ marginTop: 10, textAlign: "center" }}>
-          <button onClick={discardDrawn}>
-            Abwerfen
-          </button>
-        </div>
-      )}
+  
 
       {discardAnimCard && (
         <div
