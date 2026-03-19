@@ -53,16 +53,16 @@ export default function Game({ socket, roomId, leave }) {
     });
 
     socket.on("tempReveal", (payload) => {
-  if (!payload || !Array.isArray(payload.cards)) return;
+      if (!payload || !Array.isArray(payload.cards)) return;
 
-  const cardsWithOwner = payload.cards.map((c) => ({
-    ...c,
-    by: payload.by
-  }));
+      const cardsWithOwner = payload.cards.map((c) => ({
+        ...c,
+        by: payload.by
+      }));
 
-  setTempReveals(cardsWithOwner);
-  setTimeout(() => setTempReveals([]), 2000);
-});
+      setTempReveals(cardsWithOwner);
+      setTimeout(() => setTempReveals([]), 2000);
+    });
 
     socket.on("caboCalled", (data) => {
       setCaboBanner(data || { by: null });
@@ -198,6 +198,7 @@ export default function Game({ socket, roomId, leave }) {
   const currentName = publicState.names?.[currentPlayer] || "—";
   const opponentId = publicState.players?.find(p => p !== socket.id);
   const myHasDrawn = publicState.playerHasDrawn?.[socket.id] ?? false;
+  const isMyTurn = currentPlayer === socket.id;
 
   const getTempReveal = (playerId, index) => {
     return tempReveals.find(
@@ -220,26 +221,6 @@ export default function Game({ socket, roomId, leave }) {
 
       <div style={{ textAlign: "center" }}>
         <h3>Am Zug: {currentName}</h3>
-
-        <div style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: 10,
-          marginTop: 10
-        }}>
-          <button onClick={peekTwo} disabled={initialPeekDone || gameOver}>
-            2 Karten anschauen
-          </button>
-          <button onClick={() => takeFrom("deck")} disabled={gameOver}>
-            Nachziehstapel ({publicState?.deckCount ?? 0})
-          </button>
-          <button onClick={() => takeFrom("discard")} disabled={gameOver}>
-            Ablage ({publicState?.discardTop ?? "—"})
-          </button>
-          <button onClick={discardDrawn} disabled={gameOver}>
-            Abwerfen
-          </button>
-        </div>
       </div>
 
       <div style={{ marginTop: 20 }}>
@@ -312,12 +293,15 @@ export default function Game({ socket, roomId, leave }) {
         gap: 120
       }}>
         <div
-          onClick={() => takeFrom("deck")}
+          onClick={() => {
+            if (gameOver || !isMyTurn) return;
+            takeFrom("deck");
+          }}
           style={{
             width: 90,
             height: 140,
             position: "relative",
-            cursor: gameOver ? "default" : "pointer"
+            cursor: gameOver || !isMyTurn ? "default" : "pointer"
           }}
         >
           {[2,1,0].map((offset) => (
@@ -340,12 +324,15 @@ export default function Game({ socket, roomId, leave }) {
         </div>
 
         <div
-          onClick={() => takeFrom("discard")}
+          onClick={() => {
+            if (gameOver || !isMyTurn) return;
+            takeFrom("discard");
+          }}
           style={{
             width: 90,
             height: 140,
             position: "relative",
-            cursor: gameOver ? "default" : "pointer"
+            cursor: gameOver || !isMyTurn ? "default" : "pointer"
           }}
         >
           {[2,1].map((offset) => (
@@ -506,11 +493,27 @@ export default function Game({ socket, roomId, leave }) {
             );
           })}
         </div>
+
+        {!initialPeekDone && !gameOver && (
+          <div style={{ marginTop: 15, textAlign: "center" }}>
+            <button onClick={peekTwo}>
+              2 Karten anschauen
+            </button>
+          </div>
+        )}
       </div>
 
       <div style={{ marginTop: 15, textAlign: "center", fontSize: 18 }}>
         Gezogene Karte: {drawnCard ? (drawnCard.value ?? drawnCard) : "—"}
       </div>
+
+      {drawnCard && !gameOver && (
+        <div style={{ marginTop: 10, textAlign: "center" }}>
+          <button onClick={discardDrawn}>
+            Abwerfen
+          </button>
+        </div>
+      )}
 
       {gameOver && roundResult && (
         <div style={{
