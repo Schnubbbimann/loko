@@ -278,14 +278,7 @@ export default function Game({ socket, roomId, leave }) {
   const uiToServerOpponentIndex = (uiIndex) => opponentCount - 1 - uiIndex;
 
   return (
-    <div style={{
-      height: "100vh",
-      display: "flex",
-      flexDirection: "column",
-      justifyContent: "space-between",
-      padding: 30,
-      background: "#f3f3f3"
-    }}>
+    <div className="game-container">
 
       <div style={{ textAlign: "center" }}>
         <h3>Am Zug: {currentName}</h3>
