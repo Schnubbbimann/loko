@@ -44,6 +44,8 @@ export default function Game({ socket, roomId, leave }) {
   const [myHand, setMyHand] = useState([]);
   const [drawnCard, setDrawnCard] = useState(null);
   const [revealedIds, setRevealedIds] = useState(new Set());
+  
+  const [playerDrawing, setPlayerDrawing] = useState(null);
 
   const [special, setSpecial] = useState(null);
   const [selectedOwn, setSelectedOwn] = useState(null);
@@ -68,7 +70,10 @@ export default function Game({ socket, roomId, leave }) {
   const [discardAnim, setDiscardAnim] = useState(false);
 
   useEffect(() => {
-    socket.on("stateUpdate", setPublicState);
+   socket.on("stateUpdate", (state) => {
+  setPublicState(state);
+  setPlayerDrawing(state.playerDrawing || null);
+});
     socket.on("yourHand", setMyHand);
 
     socket.on("specialAction", (data) => {
@@ -285,6 +290,32 @@ export default function Game({ socket, roomId, leave }) {
       </div>
 
       <div style={{ marginTop: 20 }}>
+        {/* 🔥 Gegner zieht Karte */}
+{playerDrawing === opponentId && (
+  <div style={{
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: 10
+  }}>
+    <div style={{
+      width: 70,
+      height: 110,
+      borderRadius: 12,
+      overflow: "hidden",
+      boxShadow: "0 8px 18px rgba(0,0,0,0.3)"
+    }}>
+      <img
+        src={new URL(`../assets/cards/Karten_backside_gegner.png`, import.meta.url).href}
+        alt="enemy draw"
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain"
+        }}
+      />
+    </div>
+  </div>
+)}
         <h3>{publicState?.names?.[opponentId]}</h3>
 
         <div style={{ display: "flex", gap: 20, justifyContent: "center" }}>
