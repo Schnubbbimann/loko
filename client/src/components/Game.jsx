@@ -1,4 +1,3 @@
-// src/components/Game.jsx
 import "../Game.css";
 import React, { useEffect, useState } from "react";
 
@@ -8,6 +7,10 @@ const getCardImage = (value) => {
 
 const getBackImage = () => {
   return new URL(`../assets/cards/back.jpeg`, import.meta.url).href;
+};
+
+const getOpponentBackImage = () => {
+  return new URL(`../assets/cards/back_gegner.jpeg`, import.meta.url).href;
 };
 
 const flipStageStyle = {
@@ -44,8 +47,6 @@ export default function Game({ socket, roomId, leave }) {
   const [myHand, setMyHand] = useState([]);
   const [drawnCard, setDrawnCard] = useState(null);
   const [revealedIds, setRevealedIds] = useState(new Set());
-  
-  const [playerDrawing, setPlayerDrawing] = useState(null);
 
   const [special, setSpecial] = useState(null);
   const [selectedOwn, setSelectedOwn] = useState(null);
@@ -70,10 +71,7 @@ export default function Game({ socket, roomId, leave }) {
   const [discardAnim, setDiscardAnim] = useState(false);
 
   useEffect(() => {
-   socket.on("stateUpdate", (state) => {
-  setPublicState(state);
-  setPlayerDrawing(state.playerDrawing || null);
-});
+    socket.on("stateUpdate", setPublicState);
     socket.on("yourHand", setMyHand);
 
     socket.on("specialAction", (data) => {
@@ -273,6 +271,9 @@ export default function Game({ socket, roomId, leave }) {
   const myHasDrawn = publicState.playerHasDrawn?.[socket.id] ?? false;
   const isMyTurn = currentPlayer === socket.id;
 
+  const pendingDraw = publicState?.pendingDraw || null;
+  const showOpponentDraw = pendingDraw && pendingDraw.playerId !== socket.id;
+
   const getTempReveal = (playerId, index) => {
     return tempReveals.find(
       r => r.playerId === playerId && Number(r.index) === Number(index)
@@ -290,35 +291,31 @@ export default function Game({ socket, roomId, leave }) {
       </div>
 
       <div style={{ marginTop: 20 }}>
-        {/* 🔥 Gegner zieht Karte */}
-{playerDrawing === opponentId && (
-  <div style={{
-    display: "flex",
-    justifyContent: "center",
-    marginBottom: 10
-  }}>
-    <div style={{
-      width: 70,
-      height: 110,
-      borderRadius: 12,
-      overflow: "hidden",
-      boxShadow: "0 8px 18px rgba(0,0,0,0.3)"
-    }}>
-      <img
-        src={new URL(`../assets/cards/Karten_backside_gegner.png`, import.meta.url).href}
-        alt="enemy draw"
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "contain"
-        }}
-      />
-    </div>
-  </div>
-)}
         <h3>{publicState?.names?.[opponentId]}</h3>
 
-        <div style={{ display: "flex", gap: 20, justifyContent: "center" }}>
+        <div style={{ display: "flex", gap: 20, justifyContent: "center", alignItems: "center" }}>
+          {showOpponentDraw && (
+            <div
+              style={{
+                width: 70,
+                height: 110,
+                borderRadius: 12,
+                overflow: "hidden",
+                boxShadow: "0 8px 18px rgba(0,0,0,0.3)"
+              }}
+            >
+              <img
+                src={getOpponentBackImage()}
+                alt="opponent draw"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain"
+                }}
+              />
+            </div>
+          )}
+
           {Array.from({
             length: opponentCount
           }).map((_, i) => {
@@ -424,11 +421,9 @@ export default function Game({ socket, roomId, leave }) {
           onClick={() => {
   if (gameOver || !isMyTurn) return;
 
-  // 🔥 NEU: wenn Karte gezogen → abwerfen
   if (drawnCard) {
     discardDrawn();
   } else {
-    // sonst normal ziehen
     takeFrom("discard");
   }
 }}
@@ -652,8 +647,6 @@ export default function Game({ socket, roomId, leave }) {
           </div>
         )}
       </div>
-
-  
 
       {discardAnimCard && (
         <div
