@@ -56,7 +56,7 @@ io.on("connection", (socket) => {
     if (!room) return cb && cb({ ok: false });
 
     const publicState = room.game
-      ? room.game.getPublicState()
+      ? { ...room.game.getPublicState(), pendingDraw: room.game.pendingDraw || null }
       : null;
 
     cb && cb({
@@ -83,6 +83,7 @@ io.on("connection", (socket) => {
     // ensure turn/draw tracking initialized
     room.game.hasDrawn = room.game.hasDrawn || {};
     room.game.lastDrawSource = room.game.lastDrawSource || {};
+    room.game.pendingDraw = null;
 
     io.to(roomId).emit("gameStarted");
 
@@ -142,20 +143,18 @@ io.on("connection", (socket) => {
       card = game.discard.pop();
       game.lastDrawSource[socket.id] = "discard";
     }
-game.hasDrawn[socket.id] = true;
 
-// 🔥 NEU: speichern wer gerade zieht
-game.playerDrawing = socket.id;
+    game.hasDrawn[socket.id] = true;
 
-// 🔥 NEU: sofort an alle senden
-io.to(roomId).emit("stateUpdate", {
-  ...game.getPublicState(),
-  names: roomManager.getRoom(roomId).names,
-  playerDrawing: game.playerDrawing
-});
+    // keep draw visible for everyone until discard/swap ends the turn
+    game.pendingDraw = {
+      playerId: socket.id,
+      from
+    };
 
-cb && cb({ ok: true, card });
-  
+    broadcastState(roomId);
+
+    cb && cb({ ok: true, card });
   });
 
   /* ================= SWAP / DISCARD ================= */
@@ -183,6 +182,9 @@ cb && cb({ ok: true, card });
     if (index === -1 && isSpecial && wasFromDeck) {
       // push the drawn card object once onto discard
       game.discard.push(drawnCard);
+
+      // clear draw display now that the card is on the discard pile
+      game.pendingDraw = null;
 
       // IMPORTANT: broadcast state now so everyone sees the special card on the discard pile
       broadcastState(roomId);
@@ -214,7 +216,8 @@ cb && cb({ ok: true, card });
       game.replaceCard(socket.id, index, drawnCard);
     }
 
-    // end of action: reset draw flag, next turn and postTurn
+    // end of action: reset draw flag, clear pending draw, next turn and postTurn
+    game.pendingDraw = null;
     game.hasDrawn = game.hasDrawn || {};
     game.hasDrawn[socket.id] = false;
     game.nextTurn();
@@ -312,24 +315,24 @@ cb && cb({ ok: true, card });
 
     // if we have revealCards, broadcast them as a single tempReveal event to the whole room
     if (revealCards.length > 0) {
-     io.to(roomId).emit("tempReveal", {
-  by: socket.id,
-  cards: revealCards.map(c => ({
-    playerId: c.playerId,
-    index: Number(c.index),
-    value: c.value,
-    type: c.type
-  }))
-}); 
+      io.to(roomId).emit("tempReveal", {
+        by: socket.id,
+        cards: revealCards.map(c => ({
+          playerId: c.playerId,
+          index: Number(c.index),
+          value: c.value,
+          type: c.type
+        }))
+      });
     }
 
     // special ends the turn
+    game.pendingDraw = null;
     game.hasDrawn = game.hasDrawn || {};
     game.hasDrawn[socket.id] = false;
-   game.playerDrawing = null; // 🔥 reset
+    game.nextTurn();
+    postTurn(roomId);
 
-game.nextTurn();
-postTurn(roomId);
     cb && cb({ ok: true });
   });
 
@@ -394,6 +397,7 @@ postTurn(roomId);
     }
 
     // claim ends turn
+    game.pendingDraw = null;
     game.hasDrawn = game.hasDrawn || {};
     game.hasDrawn[socket.id] = false;
     game.nextTurn();
@@ -419,11 +423,13 @@ postTurn(roomId);
 
     const ok = game.callCabo(socket.id);
     if (!ok) return cb && cb({ ok: false });
+
     io.to(roomId).emit("caboCalled", {
-  by: socket.id
-});
+      by: socket.id
+    });
 
     // immediate end of this player's turn; opponent gets one final turn
+    game.pendingDraw = null;
     game.nextTurn();
     postTurn(roomId);
 
@@ -456,6 +462,7 @@ postTurn(roomId);
 
     io.to(roomId).emit("stateUpdate", {
       ...game.getPublicState(),
+      pendingDraw: game.pendingDraw || null,
       names: room.names
     });
 
