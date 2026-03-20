@@ -294,28 +294,33 @@ export default function Game({ socket, roomId, leave }) {
         <h3>{publicState?.names?.[opponentId]}</h3>
 
         <div style={{ display: "flex", gap: 20, justifyContent: "center", alignItems: "center" }}>
-          {showOpponentDraw && (
-            <div
-              style={{
-                width: 70,
-                height: 110,
-                borderRadius: 12,
-                overflow: "hidden",
-                boxShadow: "0 8px 18px rgba(0,0,0,0.3)"
-              }}
-            >
-              <img
-                src={getOpponentBackImage()}
-                alt="opponent draw"
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "contain"
-                }}
-              />
-            </div>
-          )}
-
+        
+{showOpponentDraw && (
+  <div
+    style={{
+      width: 70,
+      height: 110,
+      borderRadius: 12,
+      overflow: "hidden",
+      boxShadow: "0 8px 18px rgba(0,0,0,0.3)"
+    }}
+  >
+    <div style={flipStageStyle}>
+      <div style={flipInnerStyle(false)}>
+        <img
+          src={getOpponentBackImage()}
+          alt="opponent draw back"
+          style={flipFaceStyle}
+        />
+        <img
+          src={getOpponentBackImage()}
+          alt="opponent draw front"
+          style={flipFrontFaceStyle}
+        />
+      </div>
+    </div>
+  </div>
+)}
           {Array.from({
             length: opponentCount
           }).map((_, i) => {
