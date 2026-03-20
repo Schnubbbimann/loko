@@ -408,6 +408,9 @@ io.on("connection", (socket) => {
 
     const ok = game.callCabo(socket.id);
     if (!ok) return cb && cb({ ok: false });
+    io.to(roomId).emit("caboCalled", {
+  by: socket.id
+});
 
     // immediate end of this player's turn; opponent gets one final turn
     game.nextTurn();
