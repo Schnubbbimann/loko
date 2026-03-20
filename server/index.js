@@ -142,10 +142,20 @@ io.on("connection", (socket) => {
       card = game.discard.pop();
       game.lastDrawSource[socket.id] = "discard";
     }
+game.hasDrawn[socket.id] = true;
 
-    game.hasDrawn[socket.id] = true;
+// 🔥 NEU: speichern wer gerade zieht
+game.playerDrawing = socket.id;
 
-    cb && cb({ ok: true, card });
+// 🔥 NEU: sofort an alle senden
+io.to(roomId).emit("stateUpdate", {
+  ...game.getPublicState(),
+  names: roomManager.getRoom(roomId).names,
+  playerDrawing: game.playerDrawing
+});
+
+cb && cb({ ok: true, card });
+  
   });
 
   /* ================= SWAP / DISCARD ================= */
@@ -316,9 +326,10 @@ io.on("connection", (socket) => {
     // special ends the turn
     game.hasDrawn = game.hasDrawn || {};
     game.hasDrawn[socket.id] = false;
-    game.nextTurn();
-    postTurn(roomId);
+   game.playerDrawing = null; // 🔥 reset
 
+game.nextTurn();
+postTurn(roomId);
     cb && cb({ ok: true });
   });
 
