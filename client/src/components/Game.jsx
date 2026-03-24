@@ -71,7 +71,9 @@ export default function Game({ socket, roomId, leave }) {
   const [discardAnim, setDiscardAnim] = useState(false);
 
   useEffect(() => {
-    socket.on("stateUpdate", setPublicState);
+    socket.on("stateUpdate", (state) => {
+      setPublicState(state);
+    });
     socket.on("yourHand", setMyHand);
 
     socket.on("specialAction", (data) => {
@@ -180,7 +182,7 @@ export default function Game({ socket, roomId, leave }) {
   };
 
   const takeFrom = (from) => {
-    if (gameOver || !isMyTurn) return;
+    if (gameOver || !isMyTurn || pendingBetweenwerfen) return;
 
     socket.emit("take", { roomId, from }, (res) => {
       if (res?.ok) {
@@ -195,7 +197,7 @@ export default function Game({ socket, roomId, leave }) {
   };
 
   const swapWith = (index) => {
-    if (gameOver) return;
+    if (gameOver || pendingBetweenwerfen) return;
     if (!drawnCard) return;
     socket.emit("swap", { roomId, index, drawnCard }, () => {
       setDrawnCard(null);
@@ -205,7 +207,7 @@ export default function Game({ socket, roomId, leave }) {
   };
 
   const discardDrawn = () => {
-    if (gameOver) return;
+    if (gameOver || pendingBetweenwerfen) return;
     if (!drawnCard) return;
     if (discardAnimCard) return;
 
@@ -233,13 +235,13 @@ export default function Game({ socket, roomId, leave }) {
   };
 
   const startClaimMode = () => {
-    if (gameOver) return;
+    if (gameOver || pendingBetweenwerfen) return;
     setClaimMode(true);
     setClaimSelection([]);
   };
 
   const toggleClaim = (index) => {
-    if (gameOver) return;
+    if (gameOver || pendingBetweenwerfen) return;
     if (!claimMode) return;
 
     if (claimSelection.includes(index)) {
@@ -274,6 +276,10 @@ export default function Game({ socket, roomId, leave }) {
   const pendingDraw = publicState?.pendingDraw || null;
   const showOpponentDraw = pendingDraw && pendingDraw.playerId !== socket.id;
 
+  const pendingBetweenwerfen = publicState?.pendingBetweenwerfen || null;
+  const isBetweenwerfenActive = !!pendingBetweenwerfen;
+  const isMyBetweenwerfen = pendingBetweenwerfen?.by === socket.id;
+
   const getTempReveal = (playerId, index) => {
     return tempReveals.find(
       r => r.playerId === playerId && Number(r.index) === Number(index)
@@ -287,11 +293,22 @@ export default function Game({ socket, roomId, leave }) {
   const myFinalHand = finalHands?.[socket.id] || myHand;
   const opponentFinalHand = finalHands?.[opponentId] || [];
 
+  const discardPile = Array.isArray(publicState?.discardPile) && publicState.discardPile.length > 0
+    ? publicState.discardPile
+    : (typeof publicState?.discardTop === "number" ? [publicState.discardTop] : []);
+
+  const visibleDiscardPile = discardPile.slice(-6);
+
   return (
     <div className="game-container">
 
       <div style={{ textAlign: "center" }}>
         <h3>Am Zug: {currentName}</h3>
+        {isBetweenwerfenActive && (
+          <div style={{ marginTop: 6, fontSize: 14, color: "#2d8f6f" }}>
+            Zwischenwerfen aktiv{isMyBetweenwerfen ? " (du)" : ""}
+          </div>
+        )}
       </div>
 
       <div style={{ marginTop: 20 }}>
@@ -331,6 +348,7 @@ export default function Game({ socket, roomId, leave }) {
             const realIndex = uiToServerOpponentIndex(i);
 
             const isSelectable =
+              isMyBetweenwerfen ||
               special === "peekOpponent" ||
               (special === "swapOpponent" && selectedOwn !== null);
 
@@ -344,7 +362,20 @@ export default function Game({ socket, roomId, leave }) {
               <div
                 key={i}
                 onClick={() => {
-                  if (!isSelectable || gameOver) return;
+                  if (gameOver) return;
+
+                  if (isMyBetweenwerfen) {
+                    socket.emit("betweenwerfenResolve", {
+                      roomId,
+                      kind: "opponent",
+                      targetPlayerId: opponentId,
+                      index: realIndex
+                    });
+                    return;
+                  }
+
+                  if (isBetweenwerfenActive) return;
+                  if (!isSelectable) return;
 
                   if (special === "peekOpponent") {
                     handleOpponentPeek(realIndex);
@@ -397,14 +428,14 @@ export default function Game({ socket, roomId, leave }) {
       }}>
         <div
           onClick={() => {
-            if (gameOver || !isMyTurn) return;
+            if (gameOver || !isMyTurn || isBetweenwerfenActive) return;
             takeFrom("deck");
           }}
           style={{
             width: 90,
             height: 140,
             position: "relative",
-            cursor: gameOver || !isMyTurn ? "default" : "pointer"
+            cursor: gameOver || !isMyTurn || isBetweenwerfenActive ? "default" : "pointer"
           }}
         >
           {[2,1,0].map((offset) => (
@@ -428,7 +459,7 @@ export default function Game({ socket, roomId, leave }) {
 
         <div
           onClick={() => {
-            if (gameOver || !isMyTurn) return;
+            if (gameOver || !isMyTurn || isBetweenwerfenActive) return;
 
             if (drawnCard) {
               discardDrawn();
@@ -437,10 +468,10 @@ export default function Game({ socket, roomId, leave }) {
             }
           }}
           style={{
-            width: 90,
+            width: Math.max(90, 90 + (Math.max(0, visibleDiscardPile.length - 1) * 14)),
             height: 140,
             position: "relative",
-            cursor: gameOver || !isMyTurn ? "default" : "pointer"
+            cursor: gameOver || !isMyTurn || isBetweenwerfenActive ? "default" : "pointer"
           }}
         >
           {[2,1].map((offset) => (
@@ -461,21 +492,24 @@ export default function Game({ socket, roomId, leave }) {
             />
           ))}
 
-          {typeof publicState?.discardTop === "number" ? (
-            <img
-              src={getCardImage(publicState.discardTop)}
-              alt="discard"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                borderRadius: 14,
-                boxShadow: "0 6px 15px rgba(0,0,0,0.3)"
-              }}
-            />
+          {visibleDiscardPile.length > 0 ? (
+            visibleDiscardPile.map((value, i) => (
+              <img
+                key={`${value}-${i}`}
+                src={getCardImage(value)}
+                alt="discard"
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: i * 14,
+                  width: 90,
+                  height: 140,
+                  objectFit: "contain",
+                  borderRadius: 14,
+                  boxShadow: "0 6px 15px rgba(0,0,0,0.3)"
+                }}
+              />
+            ))
           ) : (
             <img
               src={getBackImage()}
@@ -501,10 +535,29 @@ export default function Game({ socket, roomId, leave }) {
         }}>
 
           <button
+            disabled={gameOver || isBetweenwerfenActive}
+            onClick={() => {
+              if (!gameOver) {
+                socket.emit("betweenwerfenRequest", roomId);
+              }
+            }}
+            style={{
+              padding: "10px 20px",
+              borderRadius: 20,
+              background: isBetweenwerfenActive ? "#9aa0a6" : "#2d8f6f",
+              color: "white",
+              border: "none"
+            }}
+          >
+            {isBetweenwerfenActive ? "Zwischenwerfen aktiv" : "Zwischenwerfen"}
+          </button>
+
+          <button
             disabled={
+              gameOver ||
+              isBetweenwerfenActive ||
               publicState?.players?.[publicState.turnIndex] !== socket.id ||
-              myHasDrawn ||
-              gameOver
+              myHasDrawn
             }
             onClick={() => socket.emit("callCabo", roomId)}
             style={{
@@ -522,7 +575,7 @@ export default function Game({ socket, roomId, leave }) {
 
           <button
             onClick={startClaimMode}
-            disabled={gameOver}
+            disabled={gameOver || isBetweenwerfenActive}
             style={{
               padding: "10px 20px",
               borderRadius: 20,
@@ -588,6 +641,7 @@ export default function Game({ socket, roomId, leave }) {
               const temp = getTempReveal(socket.id, i);
 
               const isSelectable =
+                isMyBetweenwerfen ||
                 special === "peekOwn" ||
                 (special === "swapOpponent" && selectedOwn === null);
 
@@ -601,6 +655,17 @@ export default function Game({ socket, roomId, leave }) {
                   key={c.id}
                   onClick={() => {
                     if (gameOver) return;
+
+                    if (isMyBetweenwerfen) {
+                      socket.emit("betweenwerfenResolve", {
+                        roomId,
+                        kind: "own",
+                        index: i
+                      });
+                      return;
+                    }
+
+                    if (isBetweenwerfenActive) return;
 
                     if (initialPeekMode)
                       handleInitialPeekClick(c.id);
