@@ -283,6 +283,10 @@ export default function Game({ socket, roomId, leave }) {
   const opponentCount = publicState?.playerCardsCount?.[opponentId] ?? 4;
   const uiToServerOpponentIndex = (uiIndex) => opponentCount - 1 - uiIndex;
 
+  const finalHands = roundResult?.finalHands || {};
+  const myFinalHand = finalHands?.[socket.id] || myHand;
+  const opponentFinalHand = finalHands?.[opponentId] || [];
+
   return (
     <div className="game-container">
 
@@ -294,33 +298,33 @@ export default function Game({ socket, roomId, leave }) {
         <h3>{publicState?.names?.[opponentId]}</h3>
 
         <div style={{ display: "flex", gap: 20, justifyContent: "center", alignItems: "center" }}>
-        
-{showOpponentDraw && (
-  <div
-    style={{
-      width: 70,
-      height: 110,
-      borderRadius: 12,
-      overflow: "hidden",
-      boxShadow: "0 8px 18px rgba(0,0,0,0.3)"
-    }}
-  >
-    <div style={flipStageStyle}>
-      <div style={flipInnerStyle(false)}>
-        <img
-          src={getOpponentBackImage()}
-          alt="opponent draw back"
-          style={flipFaceStyle}
-        />
-        <img
-          src={getOpponentBackImage()}
-          alt="opponent draw front"
-          style={flipFrontFaceStyle}
-        />
-      </div>
-    </div>
-  </div>
-)}
+          {showOpponentDraw && (
+            <div
+              style={{
+                width: 70,
+                height: 110,
+                borderRadius: 12,
+                overflow: "hidden",
+                boxShadow: "0 8px 18px rgba(0,0,0,0.3)"
+              }}
+            >
+              <div style={flipStageStyle}>
+                <div style={flipInnerStyle(false)}>
+                  <img
+                    src={getOpponentBackImage()}
+                    alt="opponent draw back"
+                    style={flipFaceStyle}
+                  />
+                  <img
+                    src={getOpponentBackImage()}
+                    alt="opponent draw front"
+                    style={flipFrontFaceStyle}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {Array.from({
             length: opponentCount
           }).map((_, i) => {
@@ -424,14 +428,14 @@ export default function Game({ socket, roomId, leave }) {
 
         <div
           onClick={() => {
-  if (gameOver || !isMyTurn) return;
+            if (gameOver || !isMyTurn) return;
 
-  if (drawnCard) {
-    discardDrawn();
-  } else {
-    takeFrom("discard");
-  }
-}}
+            if (drawnCard) {
+              discardDrawn();
+            } else {
+              takeFrom("discard");
+            }
+          }}
           style={{
             width: 90,
             height: 140,
@@ -688,38 +692,141 @@ export default function Game({ socket, roomId, leave }) {
       )}
 
       {gameOver && roundResult && (
-        <div style={{
-          position: "absolute",
-          top: "30%",
-          left: "50%",
-          transform: "translate(-50%,-50%)",
-          background: "white",
-          padding: 30,
-          borderRadius: 20,
-          boxShadow: "0 10px 40px rgba(0,0,0,0.3)"
-        }}>
-          <h3>Runde beendet</h3>
-
-          {Object.entries(roundResult.results).map(([p, pts]) => (
-            <div key={p}>
-              {publicState?.names?.[p]}: {pts} Punkte
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+            padding: 20
+          }}
+        >
+          <div
+            style={{
+              width: "min(980px, 96vw)",
+              background: "rgba(255,255,255,0.96)",
+              borderRadius: 28,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+              padding: 24,
+              textAlign: "center"
+            }}
+          >
+            <div style={{ fontSize: 34, marginBottom: 8 }}>
+              🏆 Runde beendet
             </div>
-          ))}
 
-          <div style={{ marginTop: 10 }}>
-            <strong>
-              Gewinner: {publicState?.names?.[roundResult.winner]}
-            </strong>
-          </div>
+            <div style={{ fontSize: 18, marginBottom: 18 }}>
+              Gewinner: <strong>{publicState?.names?.[roundResult.winner]}</strong>
+            </div>
 
-          <div style={{ marginTop: 15 }}>
-            <button onClick={() => {
-              setRoundResult(null);
-              setGameOver(false);
-              leave();
-            }}>
-              Zur Lobby
-            </button>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 18,
+                alignItems: "center"
+              }}
+            >
+              <div>
+                <div style={{ marginBottom: 8, fontWeight: "bold" }}>
+                  👑 Gegner
+                </div>
+                <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+                  {opponentFinalHand.map((c) => (
+                    <div
+                      key={c.id}
+                      style={{
+                        width: 72,
+                        height: 112,
+                        borderRadius: 12,
+                        overflow: "hidden",
+                        boxShadow: "0 8px 18px rgba(0,0,0,0.18)"
+                      }}
+                    >
+                      <img
+                        src={getCardImage(c.value)}
+                        alt="opponent card"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain"
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: 18,
+                  background: "#f4f0ff",
+                  fontSize: 16,
+                  fontWeight: 600
+                }}
+              >
+                Punkte:
+                {Object.entries(roundResult.results).map(([p, pts]) => (
+                  <span key={p} style={{ marginLeft: 12 }}>
+                    {publicState?.names?.[p]}: {pts}
+                  </span>
+                ))}
+              </div>
+
+              <div>
+                <div style={{ marginBottom: 8, fontWeight: "bold" }}>
+                  🙋 Dein Blatt
+                </div>
+                <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+                  {myFinalHand.map((c) => (
+                    <div
+                      key={c.id}
+                      style={{
+                        width: 72,
+                        height: 112,
+                        borderRadius: 12,
+                        overflow: "hidden",
+                        boxShadow: "0 8px 18px rgba(0,0,0,0.18)"
+                      }}
+                    >
+                      <img
+                        src={getCardImage(c.value)}
+                        alt="my card"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain"
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setRoundResult(null);
+                  setGameOver(false);
+                  leave();
+                }}
+                style={{
+                  marginTop: 8,
+                  padding: "10px 18px",
+                  borderRadius: 999,
+                  border: "none",
+                  background: "#6f42c1",
+                  color: "white",
+                  cursor: "pointer"
+                }}
+              >
+                Zur Lobby
+              </button>
+            </div>
           </div>
         </div>
       )}
