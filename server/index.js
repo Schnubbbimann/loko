@@ -56,7 +56,12 @@ io.on("connection", (socket) => {
     if (!room) return cb && cb({ ok: false });
 
     const publicState = room.game
-      ? { ...room.game.getPublicState(), pendingDraw: room.game.pendingDraw || null }
+      ? {
+          ...room.game.getPublicState(),
+          pendingDraw: room.game.pendingDraw || null,
+          pendingBetweenwerfen: room.game.pendingBetweenwerfen || null,
+          discardPile: (room.game.discard || []).map(c => c.value)
+        }
       : null;
 
     cb && cb({
@@ -84,6 +89,7 @@ io.on("connection", (socket) => {
     room.game.hasDrawn = room.game.hasDrawn || {};
     room.game.lastDrawSource = room.game.lastDrawSource || {};
     room.game.pendingDraw = null;
+    room.game.pendingBetweenwerfen = null;
 
     io.to(roomId).emit("gameStarted");
 
@@ -129,6 +135,7 @@ io.on("connection", (socket) => {
     const game = room?.game;
 
     if (!game) return cb && cb({ ok: false });
+    if (game.pendingBetweenwerfen) return cb && cb({ ok: false });
     if (game.getCurrentPlayer() !== socket.id)
       return cb && cb({ ok: false });
 
@@ -169,6 +176,88 @@ io.on("connection", (socket) => {
     cb && cb({ ok: true, card });
   });
 
+  /* ================= BETWEENWERFEN ================= */
+
+  socket.on("betweenwerfenRequest", (roomId, cb) => {
+    const room = roomManager.getRoom(roomId);
+    const game = room?.game;
+
+    if (!game) return cb && cb({ ok: false });
+    if (game.pendingBetweenwerfen) return cb && cb({ ok: false });
+
+    game.pendingBetweenwerfen = {
+      by: socket.id
+    };
+
+    broadcastState(roomId);
+
+    cb && cb({ ok: true });
+  });
+
+  socket.on("betweenwerfenResolve", ({ roomId, kind, index, targetPlayerId }, cb) => {
+    const room = roomManager.getRoom(roomId);
+    const game = room?.game;
+
+    if (!game || !game.pendingBetweenwerfen) return cb && cb({ ok: false });
+    if (game.pendingBetweenwerfen.by !== socket.id) return cb && cb({ ok: false });
+
+    const discardTop = game.discard?.[game.discard.length - 1];
+    if (!discardTop) return cb && cb({ ok: false });
+
+    const actorId = socket.id;
+    const actorHand = game.playerState?.[actorId]?.hand;
+    if (!actorHand) return cb && cb({ ok: false });
+
+    const idx = Number(index);
+    if (!Number.isFinite(idx)) return cb && cb({ ok: false });
+
+    let chosenCard = null;
+    let ownerId = null;
+
+    if (kind === "own") {
+      ownerId = actorId;
+      chosenCard = actorHand[idx] || null;
+    }
+
+    if (kind === "opponent") {
+      ownerId = targetPlayerId;
+      const targetHand = game.playerState?.[targetPlayerId]?.hand;
+      if (!targetHand) return cb && cb({ ok: false });
+      chosenCard = targetHand[idx] || null;
+    }
+
+    if (!chosenCard || !ownerId) return cb && cb({ ok: false });
+
+    const matches = chosenCard.value === discardTop.value;
+
+    if (matches) {
+      const hand = game.playerState[ownerId].hand;
+      const removed = hand.splice(idx, 1)[0];
+      if (removed) {
+        game.discard.push(removed);
+      }
+
+      game.pendingBetweenwerfen = null;
+      broadcastState(roomId);
+
+      return cb && cb({ ok: true, correct: true });
+    }
+
+    const penalty = game.drawCard();
+    if (penalty) {
+      actorHand.push({
+        id: Date.now().toString(),
+        value: penalty.value,
+        revealed: false
+      });
+    }
+
+    game.pendingBetweenwerfen = null;
+    broadcastState(roomId);
+
+    return cb && cb({ ok: true, correct: false });
+  });
+
   /* ================= SWAP / DISCARD ================= */
 
   socket.on("swap", ({ roomId, index, drawnCard }, cb) => {
@@ -176,6 +265,7 @@ io.on("connection", (socket) => {
     const game = room?.game;
 
     if (!game) return cb && cb({ ok: false });
+    if (game.pendingBetweenwerfen) return cb && cb({ ok: false });
     if (game.getCurrentPlayer() !== socket.id)
       return cb && cb({ ok: false });
 
@@ -244,6 +334,8 @@ io.on("connection", (socket) => {
     const room = roomManager.getRoom(roomId);
     const game = room?.game;
     if (!game || !game.pendingSpecial) return cb && cb({ ok: false });
+
+    if (game.pendingBetweenwerfen) return cb && cb({ ok: false });
 
     const pending = game.pendingSpecial;
     // only the player who triggered the special may resolve it
@@ -355,6 +447,7 @@ io.on("connection", (socket) => {
     const game = room?.game;
 
     if (!game) return cb && cb({ ok: false });
+    if (game.pendingBetweenwerfen) return cb && cb({ ok: false });
     if (game.getCurrentPlayer() !== socket.id)
       return cb && cb({ ok: false });
 
@@ -425,6 +518,7 @@ io.on("connection", (socket) => {
     const game = room?.game;
 
     if (!game) return cb && cb({ ok: false });
+    if (game.pendingBetweenwerfen) return cb && cb({ ok: false });
     if (game.getCurrentPlayer() !== socket.id)
       return cb && cb({ ok: false });
 
@@ -475,6 +569,8 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("stateUpdate", {
       ...game.getPublicState(),
       pendingDraw: game.pendingDraw || null,
+      pendingBetweenwerfen: game.pendingBetweenwerfen || null,
+      discardPile: (game.discard || []).map(c => c.value),
       names: room.names
     });
 
