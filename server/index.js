@@ -104,7 +104,19 @@ io.on("connection", (socket) => {
     // If after advancing turn we are in scoring -> compute & emit results
     if (game.phase === "scoring") {
       const result = game.score();
-      io.to(roomId).emit("roundResult", result);
+
+      const finalHands = {};
+      room.players.forEach((pid) => {
+        finalHands[pid] = (game.playerState?.[pid]?.hand || []).map((card) => ({
+          id: card.id,
+          value: card.value
+        }));
+      });
+
+      io.to(roomId).emit("roundResult", {
+        ...result,
+        finalHands
+      });
     } else {
       broadcastState(roomId);
     }
